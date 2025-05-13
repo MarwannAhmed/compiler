@@ -12,28 +12,46 @@
         switch (symbol->value.type) {
             case TYPE_BOOL:
                 symbolType = "bool";
-                snprintf(valueData, sizeof(valueData), "%s", symbol->value.data.i ? "true" : "false");
                 break;
             case TYPE_INT:
                 symbolType = "int";
-                snprintf(valueData, sizeof(valueData), "%d", symbol->value.data.i);
                 break;
             case TYPE_FLOAT:
                 symbolType = "float";
-                snprintf(valueData, sizeof(valueData), "%.5f", symbol->value.data.f);
                 break;
             case TYPE_CHAR:
                 symbolType = "char";
-                snprintf(valueData, sizeof(valueData), "%c", symbol->value.data.c);
                 break;
             case TYPE_STRING:
                 symbolType = "string";
-                snprintf(valueData, sizeof(valueData), "%s", symbol->value.data.s);
                 break;
             case TYPE_VOID:
                 symbolType = "void";
-                strcpy(valueData, "-");
                 break;
+        }
+        if (!symbol->isInit || symbol->value.type == TYPE_VOID) {
+            strcpy(valueData, "-");
+        } else {
+            switch (symbol->value.type) {
+                case TYPE_BOOL:
+                    snprintf(valueData, sizeof(valueData), "%s", symbol->value.data.i ? "true" : "false");
+                    break;
+                case TYPE_INT:
+                    snprintf(valueData, sizeof(valueData), "%d", symbol->value.data.i);
+                    break;
+                case TYPE_FLOAT:
+                    snprintf(valueData, sizeof(valueData), "%.5f", symbol->value.data.f);
+                    break;
+                case TYPE_CHAR:
+                    snprintf(valueData, sizeof(valueData), "%c", symbol->value.data.c);
+                    break;
+                case TYPE_STRING:
+                    snprintf(valueData, sizeof(valueData), "%s", symbol->value.data.s);
+                    break;
+                default:
+                    strcpy(valueData, "-");
+                    break;
+            }
         }
         char* symbolKind = symbol->kind == KIND_VAR ? "variable" : (symbol->kind == KIND_CONST ? "constant" : "function");
         fprintf(symbolTableVisualiser, "| %-12s | %-9s | %-12s | %-6s | %-17d |\n", symbol->name, symbolKind, valueData, symbolType, symbol->declLine);
@@ -195,6 +213,15 @@ block : SCOPE_START {
                         }
                         fprintf(symbolTableFile, "Destroying table for scope: %d\n", symbolTable->size - 1);
                         SymbolTable_pop(symbolTable);
+                        for (int i = 0; i < symbolTable->size - 1; i++) {
+                            fprintf(symbolTableVisualiser, "    ");
+                        }
+                        if(symbolTable->size == 1) {
+                            fprintf(symbolTableVisualiser, "Returning to symbol table for global scope.\n");
+                        }
+                        else {
+                            fprintf(symbolTableVisualiser, "Returning to symbol table for scope: %d.\n", symbolTable->size - 1);
+                        }
                         if (currFunc) {
                             funcDepth = funcDepth - 1;
                         }
