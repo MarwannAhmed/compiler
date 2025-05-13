@@ -5,6 +5,7 @@
 
 extern FILE* symbolTableFile;
 extern FILE* semanticAnalysisFile;
+extern FILE* symbolTableVisualiser;
 extern FILE* quadruplesFile;
 extern int line;
 extern SymbolTable* symbolTable;

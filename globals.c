@@ -2,6 +2,7 @@
 
 FILE* symbolTableFile = NULL;
 FILE* semanticAnalysisFile = NULL;
+FILE* symbolTableVisualiser = NULL;
 FILE* quadruplesFile = NULL;
 int line = 1;
 SymbolTable* symbolTable = NULL;

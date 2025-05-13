@@ -6,6 +6,58 @@
     void yyerror(const char* s);
     int yylex(void);
     extern FILE* yyin;
+
+    void writeSymbolToVisualiser(Symbol* symbol, int depth) {
+        char* symbolType;
+        char valueData[100] = "";
+        switch (symbol->value.type) {
+            case TYPE_BOOL:
+                symbolType = "bool";
+                break;
+            case TYPE_INT:
+                symbolType = "int";
+                break;
+            case TYPE_FLOAT:
+                symbolType = "float";
+                break;
+            case TYPE_CHAR:
+                symbolType = "char";
+                break;
+            case TYPE_STRING:
+                symbolType = "string";
+                break;
+            case TYPE_VOID:
+                symbolType = "void";
+                break;
+        }
+        if (!symbol->isInit || symbol->value.type == TYPE_VOID) {
+            strcpy(valueData, "-");
+        } else {
+            switch (symbol->value.type) {
+                case TYPE_BOOL:
+                    snprintf(valueData, sizeof(valueData), "%s", symbol->value.data.i ? "true" : "false");
+                    break;
+                case TYPE_INT:
+                    snprintf(valueData, sizeof(valueData), "%d", symbol->value.data.i);
+                    break;
+                case TYPE_FLOAT:
+                    snprintf(valueData, sizeof(valueData), "%.5f", symbol->value.data.f);
+                    break;
+                case TYPE_CHAR:
+                    snprintf(valueData, sizeof(valueData), "%c", symbol->value.data.c);
+                    break;
+                case TYPE_STRING:
+                    snprintf(valueData, sizeof(valueData), "%s", symbol->value.data.s);
+                    break;
+                default:
+                    strcpy(valueData, "-");
+                    break;
+            }
+        }
+        char* symbolKind = symbol->kind == KIND_VAR ? "variable" : (symbol->kind == KIND_CONST ? "constant" : "function");
+        fprintf(symbolTableVisualiser, "| %-12s | %-9s | %-12s | %-6s | %-17d |\n", symbol->name, symbolKind, valueData, symbolType, symbol->declLine);
+    }
+
 %}
 
 %union {
@@ -96,8 +148,18 @@ block : SCOPE_START {
                         }
                         for (int i = 0; i < symbolTable->size; i++) {
                             fprintf(symbolTableFile, "    ");
+                            fprintf(symbolTableVisualiser, "    ");
                         }
                         fprintf(symbolTableFile, "Constructing new table for a new scope: %d\n", symbolTable->size);
+                        fprintf(symbolTableVisualiser, "Symbol table for new scope: %d\n", symbolTable->size);
+                        for (int i = 0; i < symbolTable->size; i++) {
+                            fprintf(symbolTableVisualiser, "    ");
+                        }
+                        fprintf(symbolTableVisualiser, "| %-12s | %-9s | %-12s | %-6s | %-17s |\n", "name", "kind", "value", "type", "declaration line");
+                        for (int i = 0; i < symbolTable->size; i++) {
+                            fprintf(symbolTableVisualiser, "    ");
+                        }
+                        fprintf(symbolTableVisualiser, "------------------------------------------------------------------------\n");
                         SymbolTable_push(symbolTable);
                         if (lastSymbol && lastSymbol->kind == KIND_FUNC && currFunc) {
                             fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot declare a function inside a function.", line);
@@ -133,10 +195,12 @@ block : SCOPE_START {
                                 }
                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                     fprintf(symbolTableFile, "    ");
+                                    fprintf(symbolTableVisualiser, "    ");
                                 }
                                 fprintf(symbolTableFile, "Declared a function parameter \"%s\" of type \"%s\"\n", param->name, type_str);
                                 Symbol* symbol = Symbol_construct(param->name, param->kind, param->isInit, line, param->value, NULL, 0);
                                 SymbolTable_insert(symbolTable, symbol);
+                                writeSymbolToVisualiser(symbol, symbolTable->size);
                             }
                         }
                     }
@@ -150,6 +214,15 @@ block : SCOPE_START {
                         }
                         fprintf(symbolTableFile, "Destroying table for scope: %d\n", symbolTable->size - 1);
                         SymbolTable_pop(symbolTable);
+                        for (int i = 0; i < symbolTable->size - 1; i++) {
+                            fprintf(symbolTableVisualiser, "    ");
+                        }
+                        if(symbolTable->size == 1) {
+                            fprintf(symbolTableVisualiser, "Returning to symbol table for global scope.\n");
+                        }
+                        else {
+                            fprintf(symbolTableVisualiser, "Returning to symbol table for scope: %d.\n", symbolTable->size - 1);
+                        }
                         if (currFunc) {
                             funcDepth = funcDepth - 1;
                         }
@@ -183,10 +256,12 @@ declaration : TYPE IDENTIFIER                           {
                                                             }
                                                             for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                 fprintf(symbolTableFile, "    ");
+                                                                fprintf(symbolTableVisualiser, "    ");
                                                             }
                                                             fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\"\n", $2, $1);
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 0, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
+                                                            writeSymbolToVisualiser(symbol, symbolTable->size);
                                                             lastSymbol = symbol;
                                                         }
             | TYPE IDENTIFIER ASSIGN expression         {
@@ -204,6 +279,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.i = $4->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.i == 1 ? "true" : "false");
                                                             }
@@ -216,6 +292,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.i = $4->type == TYPE_INT ? $4->data.i : (int) $4->data.f;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %d\n", $2, $1, value.data.i);
                                                             }
@@ -228,6 +305,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.f = $4->type == TYPE_FLOAT ? $4->data.f : (float) $4->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %f\n", $2, $1, value.data.f);
                                                             }
@@ -240,6 +318,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.c = $4->data.c;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %c\n", $2, $1, value.data.c);
                                                             }
@@ -252,6 +331,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.s = $4->data.s;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.s);
                                                             }
@@ -261,6 +341,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             }
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
+                                                            writeSymbolToVisualiser(symbol, symbolTable->size);
                                                             lastSymbol = symbol;
                                                             fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $4->label, $2);
                                                         }
@@ -279,6 +360,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.i = $5->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.i == 1 ? "true" : "false");
                                                             }
@@ -291,6 +373,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.i = $5->type == TYPE_INT ? $5->data.i : (int) $5->data.f;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %d\n", $3, $2, value.data.i);
                                                             }
@@ -303,6 +386,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.f = $5->type == TYPE_FLOAT ? $5->data.f : (float) $5->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %f\n", $3, $2, value.data.f);
                                                             }
@@ -315,6 +399,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.c = $5->data.c;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %c\n", $3, $2, value.data.c);
                                                             }
@@ -327,6 +412,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.data.s = $5->data.s;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                     fprintf(symbolTableFile, "    ");
+                                                                    fprintf(symbolTableVisualiser, "    ");
                                                                 }
                                                                 fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.s);
                                                             }
@@ -336,6 +422,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             }
                                                             Symbol* symbol = Symbol_construct($3, KIND_CONST, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
+                                                            writeSymbolToVisualiser(symbol, symbolTable->size);
                                                             lastSymbol = symbol;
                                                             fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $5->label, $3);
                                                         }
@@ -360,10 +447,10 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                         var->value.data.i = $3->data.i;
                                                         break;
                                                     case TYPE_INT:
-                                                        var->value.data.i = $3->data.i;
+                                                        var->value.data.i = ($3->type == TYPE_INT) ? $3->data.i : (int) $3->data.f;
                                                         break;
                                                     case TYPE_FLOAT:
-                                                        var->value.data.f = $3->data.f;
+                                                        var->value.data.f = ($3->type == TYPE_FLOAT) ? $3->data.f : (float) $3->data.i;
                                                         break;
                                                     case TYPE_CHAR:
                                                         var->value.data.c = $3->data.c;
@@ -573,6 +660,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                     fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\" with %d parameters.\n", $2, numParams);
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
+                                                                                                    writeSymbolToVisualiser(symbol, symbolTable->size);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
                        block
@@ -628,6 +716,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                     }
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
+                                                                                                    writeSymbolToVisualiser(symbol, symbolTable->size);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
                        block
@@ -645,6 +734,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                     fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\"\n", $2);
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
+                                                                                                    writeSymbolToVisualiser(symbol, symbolTable->size);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
                        block
@@ -700,6 +790,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                     }
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
+                                                                                                    writeSymbolToVisualiser(symbol, symbolTable->size);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
                        block
@@ -1303,11 +1394,22 @@ int main(int argc, char** argv) {
         printf("Error opening SymbolTable.out.");
         return 1;
     }
+
     semanticAnalysisFile = fopen("SemanticAnalysis.out", "w");
     if (semanticAnalysisFile == NULL) {
         printf("Error opening SemanticAnalysis.out.");
         return 1;
     }
+
+    symbolTableVisualiser = fopen("SymbolTableVisualiser", "w");
+    if (symbolTableVisualiser == NULL) {
+        printf("Error opening SymbolTableVisualiser.out.");
+        return 1;
+    }
+    fprintf(symbolTableVisualiser, "Symbol table for global scope.\n");
+    fprintf(symbolTableVisualiser, "| %-12s | %-9s | %-12s | %-6s | %-17s |\n", "name", "kind", "value", "type", "declaration line");
+    fprintf(symbolTableVisualiser, "------------------------------------------------------------------------\n");
+
     quadruplesFile = fopen("Quadruples.out", "w");
     if (quadruplesFile == NULL) {
         printf("Error opening Quadruples.out.");
@@ -1316,6 +1418,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 100; i++) {
         numCases[i] = 0;
     }
+    
     symbolTable = SymbolTable_construct();
 
     yyparse();
@@ -1324,6 +1427,7 @@ int main(int argc, char** argv) {
     SymbolTable_destroy(symbolTable);
     fclose(symbolTableFile);
     fclose(semanticAnalysisFile);
+    fclose(symbolTableVisualiser);
     fclose(quadruplesFile);
     
     return 0;
