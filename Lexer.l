@@ -102,7 +102,8 @@
 "!="                                                {return NE;}
 ","                                                 {return COMMA;}
 [a-zA-Z_][a-zA-Z0-9_]*                              {yylval.s = strdup(yytext); return IDENTIFIER;}
-[ \t\n]+                                            { /* Ignore whitespace */ }
+[ \t]+                                              { /* Ignore whitespace */ }
+\n                                                  {line++;}
 %%
 
 /* Subroutines */

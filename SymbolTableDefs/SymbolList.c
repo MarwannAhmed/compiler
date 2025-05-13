@@ -26,7 +26,7 @@ Symbol* SymbolList_get(SymbolList* symbolList, char* name) {
 
 void SymbolList_destroy(SymbolList* symbolList) {
     if (symbolList->head) {
-        Symbol_destroy(symbolList->head);
+        Symbol_destroy(symbolList->head, 1);
     }
     free(symbolList);
 }

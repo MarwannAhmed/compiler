@@ -132,7 +132,7 @@ block : SCOPE_START {
                                     printf("    ");
                                 }
                                 printf("Declared a function parameter \"%s\" of type \"%s\"\n", param->name, type_str);
-                                Symbol* symbol = Symbol_construct(param->name, param->kind, param->isInit, param->value, NULL, 0);
+                                Symbol* symbol = Symbol_construct(param->name, param->kind, param->isInit, line, param->value, NULL, 0);
                                 SymbolTable_insert(symbolTable, symbol);
                             }
                         }
@@ -180,7 +180,7 @@ declaration : TYPE IDENTIFIER                           {
                                                                 printf("    ");
                                                             }
                                                             printf("Declared a variable \"%s\" of type \"%s\"\n", $2, $1);
-                                                            Symbol* symbol = Symbol_construct($2, KIND_VAR, 0, value, NULL, 0);
+                                                            Symbol* symbol = Symbol_construct($2, KIND_VAR, 0, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
                                                         }
@@ -247,7 +247,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             else {
                                                                 yyerror("Invalid declaration: cannot create a variable of unknown type.");
                                                             }
-                                                            Symbol* symbol = Symbol_construct($2, KIND_VAR, 1, value, NULL, 0);
+                                                            Symbol* symbol = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
                                                         }
@@ -314,7 +314,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             else {
                                                                 yyerror("Invalid declaration: cannot create a constant of unknown type.");
                                                             }
-                                                            Symbol* symbol = Symbol_construct($2, KIND_CONST, 1, value, NULL, 0);
+                                                            Symbol* symbol = Symbol_construct($2, KIND_CONST, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
                                                         }
@@ -419,6 +419,7 @@ for_loop : FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS 
                                                                                                                                                                                                     if (var->value.type != TYPE_INT) {
                                                                                                                                                                                                         yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
                                                                                                                                                                                                     }
+                                                                                                                                                                                                    var->isUsed = 1;
                                                                                                                                                                                                 }
          | FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS STEP OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block {
                                                                                                                                                                                                     Symbol* var = SymbolTable_get(symbolTable, $2);
@@ -431,6 +432,7 @@ for_loop : FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS 
                                                                                                                                                                                                     if (var->value.type != TYPE_INT) {
                                                                                                                                                                                                         yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
                                                                                                                                                                                                     }
+                                                                                                                                                                                                    var->isUsed = 1;
                                                                                                                                                                                                 }
          ;
 
@@ -451,7 +453,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                         printf("    ");
                                                                                                     }
                                                                                                     printf("Declared a function \"%s\" of type \"void\" with %d parameters.\n", $2, numParams);
-                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, value, $4, numParams);
+                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
@@ -504,7 +506,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                     else {
                                                                                                         yyerror("Invalid declaration: cannot create a function of unknown type.");
                                                                                                     }
-                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, value, $4, numParams);
+                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
@@ -520,7 +522,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                         printf("    ");
                                                                                                     }
                                                                                                     printf("Declared a function \"%s\" of type \"void\"\n", $2);
-                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, value, NULL, 0);
+                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
@@ -573,7 +575,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                     else {
                                                                                                         yyerror("Invalid declaration: cannot create a function of unknown type.");
                                                                                                     }
-                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, value, NULL, 0);
+                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
@@ -620,7 +622,7 @@ parameter : TYPE IDENTIFIER {
                                 else {
                                     yyerror("Invalid declaration: cannot create a parameter of unknown type.");
                                 }
-                                $$ = Symbol_construct($2, KIND_VAR, 1, value, NULL, 0);
+                                $$ = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
                             }
           ;
 
@@ -676,6 +678,7 @@ function_call : IDENTIFIER OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS
                                                                                                 $$->data.i = 0;
                                                                                                 break;
                                                                                         }
+                                                                                        func->isUsed = 1;
                                                                                     }
               | IDENTIFIER OPENING_PARENTHESIS CLOSING_PARENTHESIS                  {
                                                                                         Symbol* func = SymbolTable_get(symbolTable, $1);
@@ -707,6 +710,7 @@ function_call : IDENTIFIER OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS
                                                                                                 $$->data.i = 0;
                                                                                                 break;
                                                                                         }
+                                                                                        func->isUsed = 1;
                                                                                     }
               ;
 
@@ -1049,6 +1053,7 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                                     $$->data.s = symbol->value.data.s;
                                                                                     break;
                                                                             }
+                                                                            symbol->isUsed = 1;
                                                                         }
         | function_call                                                 {
                                                                             if ($1->type == TYPE_VOID) {
@@ -1066,7 +1071,7 @@ print_statement : PRINT OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS
 
 /* Subroutines */
 void yyerror(const char* s) {
-    fprintf(stderr, "\nError: %s\n", s);
+    fprintf(stderr, "\nLine %d: %s\n", line, s);
     exit(1);
 }
 
@@ -1081,6 +1086,7 @@ int main(int argc, char** argv) {
         yyin = stdin;
     }
 
+    line = 1;
     symbolTable = SymbolTable_construct();
     numParams = 0;
     lastSymbol = NULL;
@@ -1091,5 +1097,8 @@ int main(int argc, char** argv) {
 
     yyparse();
     fclose(yyin);
+
+    SymbolTable_destroy(symbolTable);
+    
     return 0;
 }
