@@ -5,6 +5,15 @@
     void yyerror(const char* s);
     int yylex(void);
     extern FILE* yyin;
+
+    char* addTempVar(int* n) {
+        char* label;
+        int size = snprintf(NULL, 0, "t%d", *n);
+        label = malloc(sizeof(size + 1));
+        sprintf(label, "t%d", *n);
+        (*n)++;
+        return label;
+    }
 %}
 
 %union {
@@ -261,6 +270,8 @@ declaration : TYPE IDENTIFIER                           {
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
+                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "=", $4->label, "N/A", $2);
+                                                            tempVars = 0;
                                                         }
             | CONST TYPE IDENTIFIER ASSIGN expression   {
                                                             if (ScopeSymbolTable_get(symbolTable->head, $2)) {
@@ -335,6 +346,8 @@ declaration : TYPE IDENTIFIER                           {
                                                             Symbol* symbol = Symbol_construct($2, KIND_CONST, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
+                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "=", $5->label, "N/A", $3);
+                                                            tempVars = 0;
                                                         }
             ;
 
@@ -369,6 +382,8 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                         var->value.data.s = $3->data.s;
                                                         break;
                                                 }
+                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "=", $3->label, "N/A", $1);
+                                                tempVars = 0;
                                             }
            ;
 
@@ -794,6 +809,8 @@ logical_expression : logical_expression OR logical_conjunction  {
                                                                     $$ = malloc(sizeof(Value));
                                                                     $$->type = TYPE_BOOL;
                                                                     $$->data.i = $1->data.i || $3->data.i;
+                                                                    $$->label = addTempVar(&tempVars);
+                                                                    fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "|", $1->label, $3->label, $$->label);
                                                                 }
                    | logical_conjunction                        {
                                                                     $$ = $1;
@@ -808,6 +825,8 @@ logical_conjunction : logical_conjunction AND logical_comparison    {
                                                                         $$ = malloc(sizeof(Value));
                                                                         $$->type = TYPE_BOOL;
                                                                         $$->data.i = $1->data.i && $3->data.i;
+                                                                        $$->label = addTempVar(&tempVars);
+                                                                        fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "&", $1->label, $3->label, $$->label);
                                                                     }
                     | logical_comparison                            {
                                                                         $$ = $1;
@@ -839,6 +858,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "==", $1->label, $3->label, $$->label);
                                                                         }
                    | logical_comparison NE mathematical_expression      {
                                                                             if ($1->type == TYPE_BOOL && $3->type == TYPE_BOOL) {
@@ -865,6 +886,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "!=", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression LT mathematical_expression {
                                                                             if (($1->type == TYPE_INT || $1->type == TYPE_FLOAT) && ($3->type == TYPE_INT || $3->type == TYPE_FLOAT)) {
@@ -881,6 +904,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "<", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression GT mathematical_expression {
                                                                             if (($1->type == TYPE_INT || $1->type == TYPE_FLOAT) && ($3->type == TYPE_INT || $3->type == TYPE_FLOAT)) {
@@ -897,6 +922,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", ">", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression LE mathematical_expression {
                                                                             if (($1->type == TYPE_INT || $1->type == TYPE_FLOAT) && ($3->type == TYPE_INT || $3->type == TYPE_FLOAT)) {
@@ -913,6 +940,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "<=", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression GE mathematical_expression {
                                                                             if (($1->type == TYPE_INT || $1->type == TYPE_FLOAT) && ($3->type == TYPE_INT || $3->type == TYPE_FLOAT)) {
@@ -929,6 +958,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", ">=", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression                            {
                                                                             $$ = $1;
@@ -948,6 +979,8 @@ mathematical_expression : mathematical_expression PLUS mathematical_term    {
                                                                                 else {
                                                                                     $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) + ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
                                                                                 }
+                                                                                $$->label = addTempVar(&tempVars);
+                                                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "+", $1->label, $3->label, $$->label);
                                                                             }
                         | mathematical_expression MINUS mathematical_term   {
                                                                                 if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
@@ -962,6 +995,8 @@ mathematical_expression : mathematical_expression PLUS mathematical_term    {
                                                                                 else {
                                                                                     $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) - ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
                                                                                 }
+                                                                                $$->label = addTempVar(&tempVars);
+                                                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "-", $1->label, $3->label, $$->label);
                                                                             }
                         | mathematical_term                                 {
                                                                                 $$ = $1;
@@ -981,6 +1016,8 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                         else {
                                                                             $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) * ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
                                                                         }
+                                                                        $$->label = addTempVar(&tempVars);
+                                                                        fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "*", $1->label, $3->label, $$->label);
                                                                     }
                   | mathematical_term DIV mathematical_exponent     {
                                                                         if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
@@ -999,6 +1036,8 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                         else {
                                                                             $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) / ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
                                                                         }
+                                                                        $$->label = addTempVar(&tempVars);
+                                                                        fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "/", $1->label, $3->label, $$->label);
                                                                     }
                   | mathematical_term MOD mathematical_exponent     {
                                                                         if ($1->type != TYPE_INT || $3->type != TYPE_INT) {
@@ -1012,6 +1051,8 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                         $$ = malloc(sizeof(Value));
                                                                         $$->type = TYPE_INT;
                                                                         $$->data.i = $1->data.i % $3->data.i;
+                                                                        $$->label = addTempVar(&tempVars);
+                                                                        fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "%", $1->label, $3->label, $$->label);
                                                                     }
                   | mathematical_exponent                           {
                                                                         $$ = $1;
@@ -1031,6 +1072,8 @@ mathematical_exponent : primary POW mathematical_exponent   {
                                                                 else {
                                                                     $$->data.f = pow(($1->type == TYPE_INT ? $1->data.i : $1->data.f), ($3->type == TYPE_INT ? $3->data.i : $3->data.f));
                                                                 }
+                                                                $$->label = addTempVar(&tempVars);
+                                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "^", $1->label, $3->label, $$->label);
                                                             }
                       | primary                             {
                                                                 $$ = $1;
@@ -1053,6 +1096,8 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                             else {
                                                                                 $$->data.f = -($2->data.f);
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "-", $2->label, "N/A", $$->label);
                                                                         }
         | NOT primary                                                   {
                                                                             if ($2->type != TYPE_BOOL) {
@@ -1062,31 +1107,45 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_BOOL;
                                                                             $$->data.i = !($2->data.i);
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "!", $2->label, "N/A", $$->label);
                                                                         }
         | INTEGER                                                       {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_INT;
                                                                             $$->data.i = $1;
+                                                                            int size = snprintf(NULL, 0, "%d", $1);
+                                                                            $$->label = malloc(size + 1);
+                                                                            sprintf($$->label, "%d", $1);
                                                                         }
         | FLOAT                                                         {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_FLOAT;
                                                                             $$->data.f = $1;
+                                                                            int size = snprintf(NULL, 0, "%f", $1);
+                                                                            $$->label = malloc(size + 1);
+                                                                            sprintf($$->label, "%f", $1);
                                                                         }
         | BOOL                                                          {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_BOOL;
                                                                             $$->data.i = $1;
+                                                                            $$->label = malloc($1 == 1 ? 5 : 6);
+                                                                            strcpy($$->label, $1 == 1 ? "true" : "false");
                                                                         }
         | CHAR                                                          {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_CHAR;
                                                                             $$->data.c = $1;
+                                                                            $$->label = malloc(2);
+                                                                            sprintf($$->label, "%c", $1);
                                                                         }
         | STRING                                                        {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_STRING;
                                                                             $$->data.s = $1;
+                                                                            $$->label = malloc(sizeof($1) + 1);
+                                                                            strcpy($$->label, $1);
                                                                         }
         | IDENTIFIER                                                    {
                                                                             $$ = malloc(sizeof(Value));
@@ -1122,6 +1181,8 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                                     break;
                                                                             }
                                                                             symbol->isUsed = 1;
+                                                                            $$->label = malloc(sizeof($1) + 1);
+                                                                            strcpy($$->label, $1);
                                                                         }
         | function_call                                                 {
                                                                             if ($1->type == TYPE_VOID) {
@@ -1163,6 +1224,11 @@ int main(int argc, char** argv) {
     semanticAnalysisFile = fopen("SemanticAnalysis.out", "w");
     if (semanticAnalysisFile == NULL) {
         printf("Error opening SemanticAnalysis.out.");
+        return 1;
+    }
+    quadruplesFile = fopen("Quadruples.out", "w");
+    if (quadruplesFile == NULL) {
+        printf("Error opening Quadruples.out.");
         return 1;
     }
     line = 1;

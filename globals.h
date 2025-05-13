@@ -5,6 +5,7 @@
 
 extern FILE* symbolTableFile;
 extern FILE* semanticAnalysisFile;
+extern FILE* quadruplesFile;
 extern int line;
 extern SymbolTable* symbolTable;
 extern int numParams;
@@ -13,5 +14,6 @@ extern int numArgs;
 extern int numCases;
 extern Symbol* currFunc;
 extern int funcDepth;
+extern int tempVars;
 
 #endif
