@@ -1,19 +1,11 @@
 /* Definitions */
 %{
     #include "globals.h"
+    #include "utils.h"
 
     void yyerror(const char* s);
     int yylex(void);
     extern FILE* yyin;
-
-    char* addTempVar(int* n) {
-        char* label;
-        int size = snprintf(NULL, 0, "t%d", *n);
-        label = malloc(sizeof(size + 1));
-        sprintf(label, "t%d", *n);
-        (*n)++;
-        return label;
-    }
 %}
 
 %union {
@@ -270,7 +262,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
-                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "=", $4->label, "N/A", $2);
+                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n\n", "=", $4->label, "N/A", $2);
                                                             tempVars = 0;
                                                         }
             | CONST TYPE IDENTIFIER ASSIGN expression   {
@@ -346,7 +338,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             Symbol* symbol = Symbol_construct($2, KIND_CONST, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
-                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "=", $5->label, "N/A", $3);
+                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n\n", "=", $5->label, "N/A", $3);
                                                             tempVars = 0;
                                                         }
             ;
@@ -382,7 +374,7 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                         var->value.data.s = $3->data.s;
                                                         break;
                                                 }
-                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "=", $3->label, "N/A", $1);
+                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n\n", "=", $3->label, "N/A", $1);
                                                 tempVars = 0;
                                             }
            ;
@@ -1137,15 +1129,17 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_CHAR;
                                                                             $$->data.c = $1;
-                                                                            $$->label = malloc(2);
-                                                                            sprintf($$->label, "%c", $1);
+                                                                            $$->label = malloc(4);
+                                                                            sprintf($$->label, "'%c'", $1);
                                                                         }
         | STRING                                                        {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_STRING;
                                                                             $$->data.s = $1;
-                                                                            $$->label = malloc(sizeof($1) + 1);
-                                                                            strcpy($$->label, $1);
+                                                                            $$->label = malloc(strlen($1) + 3);
+                                                                            strcpy($$->label + 1, $1);
+                                                                            $$->label[0] = '"';
+                                                                            $$->label[strlen($1) + 1] = '"';
                                                                         }
         | IDENTIFIER                                                    {
                                                                             $$ = malloc(sizeof(Value));

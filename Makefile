@@ -17,4 +17,4 @@ flex:
 	flex.exe Lexer.l
 
 comp:
-	gcc.exe SymbolTableDefs/Symbol.c SymbolTableDefs/SymbolList.c SymbolTableDefs/ScopeSymbolTable.c SymbolTableDefs/SymbolTable.c globals.c Parser.tab.c lex.yy.c -o Compiler.exe
+	gcc.exe SymbolTableDefs/Symbol.c SymbolTableDefs/SymbolList.c SymbolTableDefs/ScopeSymbolTable.c SymbolTableDefs/SymbolTable.c globals.c utils.c Parser.tab.c lex.yy.c -o Compiler.exe
