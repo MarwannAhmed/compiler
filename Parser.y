@@ -1401,7 +1401,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    symbolTableVisualiser = fopen("SymbolTableVisualiser", "w");
+    symbolTableVisualiser = fopen("SymbolTableVisualiser.out", "w");
     if (symbolTableVisualiser == NULL) {
         printf("Error opening SymbolTableVisualiser.out.");
         return 1;

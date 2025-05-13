@@ -6,5 +6,6 @@ Parser.output
 src.txt
 .vscode/
 SymbolTable.out
+SymbolTableVisualiser.out
 SemanticAnalysis.out
 Quadruples.out
