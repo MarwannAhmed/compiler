@@ -1,4 +1,5 @@
 #include "Symbol.h"
+#include "../globals.h"
 
 Symbol* Symbol_construct(char* name, Kind kind, int isInit, int declLine, Value value, Symbol** params, int numParams) {
     Symbol* symbol = malloc(sizeof(Symbol));
@@ -19,7 +20,7 @@ Symbol* Symbol_construct(char* name, Kind kind, int isInit, int declLine, Value 
 
 void Symbol_destroy(Symbol* symbol, int verbose) {
     if (verbose && !symbol->isUsed) {
-        printf("Warning: Unused symbol \"%s\" at line %d\n", symbol->name, symbol->declLine);
+        fprintf(semanticAnalysisFile, "Warning: Unused symbol \"%s\" at line %d\n", symbol->name, symbol->declLine);
     }
     for (int i = 0; i < symbol->numParams; i++) {
         Symbol_destroy(symbol->params[i], 0);

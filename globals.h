@@ -3,6 +3,9 @@
 
 #include "SymbolTableDefs/SymbolTable.h"
 
+extern FILE* symbolTableFile;
+extern FILE* semanticAnalysisFile;
+extern FILE* symbolTableVisualiser;
 extern int line;
 extern SymbolTable* symbolTable;
 extern int numParams;

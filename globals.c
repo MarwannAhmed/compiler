@@ -1,5 +1,8 @@
 #include "globals.h"
 
+FILE* symbolTableFile = NULL;
+FILE* semanticAnalysisFile = NULL;
+FILE* symbolTableVisualiser = NULL;
 int line = 1;
 SymbolTable* symbolTable = NULL;
 int numParams = 0;
