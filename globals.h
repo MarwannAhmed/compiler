@@ -21,4 +21,6 @@ extern int switchDepth;
 extern char* labelNames[1000];
 extern int labelDepth;
 extern int switchLabel[100];
+extern char* forIterator[100];
+extern int forDepth;
 #endif

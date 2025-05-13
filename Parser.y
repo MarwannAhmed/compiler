@@ -263,7 +263,6 @@ declaration : TYPE IDENTIFIER                           {
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
                                                             fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $4->label, $2);
-                                                            tempVars = 0;
                                                         }
             | CONST TYPE IDENTIFIER ASSIGN expression   {
                                                             if (ScopeSymbolTable_get(symbolTable->head, $2)) {
@@ -339,7 +338,6 @@ declaration : TYPE IDENTIFIER                           {
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
                                                             fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $5->label, $3);
-                                                            tempVars = 0;
                                                         }
             ;
 
@@ -375,7 +373,6 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                         break;
                                                 }
                                                 fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $3->label, $1);
-                                                tempVars = 0;
                                             }
            ;
 
@@ -385,7 +382,6 @@ decision : expression   {
                                 yyerror("Invalid statement: cannot use a non-boolean expression as a decision expression.");
                             }
                             $$ = $1;
-                            tempVars = 0;
                         }
 
 iterator : expression   {
@@ -499,38 +495,62 @@ case_statement : case_header block  {
 default_case : DEFAULT block
              ;
 
-for_loop : FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block                                                       {
-                                                                                                                                                                                                    Symbol* var = SymbolTable_get(symbolTable, $2);
-                                                                                                                                                                                                    if (!var) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
-                                                                                                                                                                                                        yyerror("Invalid expression: cannot find symbol.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statemen: cannot use a constant or a function as a for loop iterator.", line);
-                                                                                                                                                                                                        yyerror("Invalid statemen: cannot use a constant or a function as a for loop iterator.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    if (var->value.type != TYPE_INT) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer variable as a for loop iterator.", line);
-                                                                                                                                                                                                        yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    var->isUsed = 1;
-                                                                                                                                                                                                }
-         | FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS STEP OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block {
-                                                                                                                                                                                                    Symbol* var = SymbolTable_get(symbolTable, $2);
-                                                                                                                                                                                                    if (!var) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
-                                                                                                                                                                                                        yyerror("Invalid expression: cannot find symbol.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statemen: cannot use a constant or a function as a for loop iterator.", line);
-                                                                                                                                                                                                        yyerror("Invalid statemen: cannot use a constant or a function as a for loop iterator.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    if (var->value.type != TYPE_INT) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer variable as a for loop iterator.", line);
-                                                                                                                                                                                                        yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    var->isUsed = 1;
-                                                                                                                                                                                                }
+for_from : FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS {
+                                                                                    Symbol* var = SymbolTable_get(symbolTable, $2);
+                                                                                    if (!var) {
+                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
+                                                                                        yyerror("Invalid expression: cannot find symbol.");
+                                                                                    }
+                                                                                    if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
+                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statemen: cannot use a constant or a function as a for loop iterator.", line);
+                                                                                        yyerror("Invalid statemen: cannot use a constant or a function as a for loop iterator.");
+                                                                                    }
+                                                                                    if (var->value.type != TYPE_INT) {
+                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer variable as a for loop iterator.", line);
+                                                                                        yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
+                                                                                    }
+                                                                                    var->isUsed = 1;
+                                                                                    fprintf(quadruplesFile, "(=, %s, N/A, %s)\n", $5->label, $2);
+                                                                                    labelNames[labelDepth] = malloc(20);
+                                                                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                                    fprintf(quadruplesFile, "LABEL%d:\n", labels);
+                                                                                    labelDepth++;
+                                                                                    labels++;
+                                                                                    forIterator[forDepth] = malloc(50);
+                                                                                    strcpy(forIterator[forDepth], var->name);
+                                                                                    forDepth++;
+                                                                                }
+         ;
+
+for_to : TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS    {
+                                                                    char* temp = addTempVar(&tempVars);
+                                                                    fprintf(quadruplesFile, "(<, %s, %s, %s)\n", forIterator[forDepth - 1], $3->label, temp);
+                                                                    labelNames[labelDepth] = malloc(20);
+                                                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                    fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n", labels);
+                                                                    labelDepth++;
+                                                                    labels++;
+                                                                }
+       ;
+
+for_loop : for_from for_to block                                                        {
+                                                                                            forDepth--;
+                                                                                            char* temp = addTempVar(&tempVars);
+                                                                                            fprintf(quadruplesFile, "(+, %s, 1, %s)\n", forIterator[forDepth], temp);
+                                                                                            fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
+                                                                                            fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                                                                            labelDepth--;
+                                                                                            labelDepth--;
+                                                                                        }
+         | for_from for_to STEP OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block  {
+                                                                                            forDepth--;
+                                                                                            char* temp = addTempVar(&tempVars);
+                                                                                            fprintf(quadruplesFile, "(+, %s, %s, %s)\n", forIterator[forDepth], $5->label, temp);
+                                                                                            fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
+                                                                                            fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                                                                            labelDepth--;
+                                                                                            labelDepth--;
+                                                                                        }
          ;
 
 while_loop : WHILE OPENING_PARENTHESIS decision CLOSING_PARENTHESIS block

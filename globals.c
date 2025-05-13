@@ -18,3 +18,5 @@ int switchDepth = 0;
 char* labelNames[1000];
 int labelDepth = 0;
 int switchLabel[100];
+char* forIterator[100];
+int forDepth;
