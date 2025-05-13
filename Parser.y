@@ -1,6 +1,7 @@
 /* Definitions */
 %{
     #include "globals.h"
+    #include "utils.h"
 
     void yyerror(const char* s);
     int yylex(void);
@@ -116,7 +117,7 @@
 %token NE
 %type<p> parameter
 %type<pl> parameter_list
-%type <v> expression mathematical_expression mathematical_term mathematical_exponent logical_expression logical_conjunction logical_comparison primary argument function_call case_statement decision iterator
+%type <v> expression mathematical_expression mathematical_term mathematical_exponent logical_expression logical_conjunction logical_comparison primary argument function_call case_statement decision iterator switch_header case_header
 %type<vl> argument_list case_statements
 /* Production Rules */
 %%
@@ -160,14 +161,14 @@ block : SCOPE_START {
                         }
                         fprintf(symbolTableVisualiser, "------------------------------------------------------------------------\n");
                         SymbolTable_push(symbolTable);
-                        if (lastSymbol->kind == KIND_FUNC && currFunc) {
+                        if (lastSymbol && lastSymbol->kind == KIND_FUNC && currFunc) {
                             fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot declare a function inside a function.", line);
                             yyerror("Invalid statement: cannot declare a function inside a function.");
                         }
-                        if (lastSymbol->kind == KIND_FUNC && !currFunc) {
+                        if (lastSymbol && lastSymbol->kind == KIND_FUNC && !currFunc) {
                             currFunc = lastSymbol;
                         }
-                        if (lastSymbol->kind == KIND_FUNC && lastSymbol->numParams > 0) {
+                        if (lastSymbol && lastSymbol->kind == KIND_FUNC && lastSymbol->numParams > 0) {
                             for (int i = 0; i < numParams; i++) {
                                 Symbol* param = lastSymbol->params[i];
                                 if (ScopeSymbolTable_get(symbolTable->head, param->name)) {
@@ -342,6 +343,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             writeSymbolToVisualiser(symbol, symbolTable->size);
                                                             lastSymbol = symbol;
+                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $4->label, $2);
                                                         }
             | CONST TYPE IDENTIFIER ASSIGN expression   {
                                                             if (ScopeSymbolTable_get(symbolTable->head, $2)) {
@@ -422,6 +424,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             writeSymbolToVisualiser(symbol, symbolTable->size);
                                                             lastSymbol = symbol;
+                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $5->label, $3);
                                                         }
             ;
 
@@ -456,6 +459,7 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                         var->value.data.s = $3->data.s;
                                                         break;
                                                 }
+                                                fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $3->label, $1);
                                             }
            ;
 
@@ -475,83 +479,165 @@ iterator : expression   {
                             $$ = $1;
                         }
 
-if_statement : IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS block
-             | IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS block ELSE block
+if_header : IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS {
+                                                                    labelNames[labelDepth] = malloc(20);
+                                                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                    labels++;
+                                                                    labelDepth++;
+                                                                    labelNames[labelDepth] = malloc(20);
+                                                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                    fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n", labels);
+                                                                    labels++;
+                                                                    labelDepth++;
+                                                                }
+          ;
+
+if_statement : if_header block      {
+                                        fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                        labelDepth--;
+                                        labelDepth--;
+                                    }
+             | if_header block ELSE {
+                                        fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
+                                        fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                    }
+               block                {
+                                        fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 2]);
+                                        labelDepth--;
+                                        labelDepth--;
+                                    }
              ;
 
-switch_statement : SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS SCOPE_START case_statements SCOPE_END              {
-                                                                                                                                    for (int i = 0; i < numCases; i++) {
-                                                                                                                                        if ($3->type != ($6)[i]->type) {
-                                                                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
-                                                                                                                                            yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
-                                                                                                                                        }
-                                                                                                                                    }
-                                                                                                                                }
-                 | SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS SCOPE_START case_statements default_case SCOPE_END {
-                                                                                                                                    for (int i = 0; i < numCases; i++) {
-                                                                                                                                        if ($3->type != ($6)[i]->type) {
-                                                                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
-                                                                                                                                            yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
-                                                                                                                                        }
-                                                                                                                                    }
-                                                                                                                                }
+switch_header : SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS   {
+                                                                                switchExpr[switchDepth] = malloc(sizeof(Value));
+                                                                                switchExpr[switchDepth] = $3;
+                                                                                switchLabel[switchDepth] = labelDepth;
+                                                                                switchDepth++;
+                                                                                labelNames[labelDepth] = malloc(20);
+                                                                                sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                                labelDepth++;
+                                                                                labels++;
+                                                                                $$ = $3;
+                                                                            }
+              ;
+
+switch_statement : switch_header SCOPE_START case_statements SCOPE_END              {
+                                                                                        for (int i = 0; i < numCases[switchDepth]; i++) {
+                                                                                            if ($1->type != ($3)[i]->type) {
+                                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
+                                                                                                yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
+                                                                                            }
+                                                                                        }
+                                                                                        switchDepth--;
+                                                                                        labelDepth--;
+                                                                                        fprintf(quadruplesFile, "%s:\n", labelNames[switchLabel[switchDepth]]);
+                                                                                    }
+                 | switch_header SCOPE_START case_statements default_case SCOPE_END {
+                                                                                        for (int i = 0; i < numCases[switchDepth]; i++) {
+                                                                                            if ($1->type != ($3)[i]->type) {
+                                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
+                                                                                                yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
+                                                                                            }
+                                                                                        }
+                                                                                        switchDepth--;
+                                                                                        labelDepth--;
+                                                                                        fprintf(quadruplesFile, "%s:\n", labelNames[switchLabel[switchDepth]]);
+                                                                                    }
                  ;
 
 case_statements : case_statements case_statement    {
-                                                        numCases = numCases + 1;
-                                                        $$ = malloc(numCases * sizeof(Value*));
-                                                        for (int i = 0; i < numCases - 1; i++) {
+                                                        numCases[switchDepth] = numCases[switchDepth] + 1;
+                                                        $$ = malloc(numCases[switchDepth] * sizeof(Value*));
+                                                        for (int i = 0; i < numCases[switchDepth] - 1; i++) {
                                                             ($$)[i] = ($1)[i];
                                                         }
-                                                        ($$)[numCases - 1] = $2;
+                                                        ($$)[numCases[switchDepth] - 1] = $2;
                                                     }
                 | case_statement                    {
-                                                        numCases = 1;
+                                                        numCases[switchDepth] = 1;
                                                         $$ = malloc(sizeof(Value*));
                                                         ($$)[0] = $1;
                                                     }
                 ;
 
-case_statement : CASE OPENING_PARENTHESIS expression CLOSING_PARENTHESIS block  {
-                                                                                    $$ = $3;
-                                                                                }
+case_header : CASE OPENING_PARENTHESIS expression CLOSING_PARENTHESIS   {
+                                                                            $$ = $3;
+                                                                            char* temp = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(==, %s, %s, %s)\n", switchExpr[switchDepth - 1]->label, $3->label, temp);
+                                                                            labelNames[labelDepth] = malloc(20);
+                                                                            sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                            fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n", labels);
+                                                                            labelDepth++;
+                                                                            labels++;
+                                                                        }
+
+case_statement : case_header block  {
+                                        $$ = $1;
+                                        fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[switchLabel[switchDepth - 1]]);
+                                        fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                        labelDepth--;
+                                    }
                ;
 
 default_case : DEFAULT block
              ;
 
-for_loop : FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block                                                       {
-                                                                                                                                                                                                    Symbol* var = SymbolTable_get(symbolTable, $2);
-                                                                                                                                                                                                    if (!var) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
-                                                                                                                                                                                                        yyerror("Invalid expression: cannot find symbol.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statemen: cannot use a constant or a function as a for loop iterator.", line);
-                                                                                                                                                                                                        yyerror("Invalid statemen: cannot use a constant or a function as a for loop iterator.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    if (var->value.type != TYPE_INT) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer variable as a for loop iterator.", line);
-                                                                                                                                                                                                        yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    var->isUsed = 1;
-                                                                                                                                                                                                }
-         | FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS STEP OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block {
-                                                                                                                                                                                                    Symbol* var = SymbolTable_get(symbolTable, $2);
-                                                                                                                                                                                                    if (!var) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
-                                                                                                                                                                                                        yyerror("Invalid expression: cannot find symbol.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statemen: cannot use a constant or a function as a for loop iterator.", line);
-                                                                                                                                                                                                        yyerror("Invalid statemen: cannot use a constant or a function as a for loop iterator.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    if (var->value.type != TYPE_INT) {
-                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer variable as a for loop iterator.", line);
-                                                                                                                                                                                                        yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
-                                                                                                                                                                                                    }
-                                                                                                                                                                                                    var->isUsed = 1;
-                                                                                                                                                                                                }
+for_from : FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS {
+                                                                                    Symbol* var = SymbolTable_get(symbolTable, $2);
+                                                                                    if (!var) {
+                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
+                                                                                        yyerror("Invalid expression: cannot find symbol.");
+                                                                                    }
+                                                                                    if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
+                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statemen: cannot use a constant or a function as a for loop iterator.", line);
+                                                                                        yyerror("Invalid statemen: cannot use a constant or a function as a for loop iterator.");
+                                                                                    }
+                                                                                    if (var->value.type != TYPE_INT) {
+                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer variable as a for loop iterator.", line);
+                                                                                        yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
+                                                                                    }
+                                                                                    var->isUsed = 1;
+                                                                                    fprintf(quadruplesFile, "(=, %s, N/A, %s)\n", $5->label, $2);
+                                                                                    labelNames[labelDepth] = malloc(20);
+                                                                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                                    fprintf(quadruplesFile, "LABEL%d:\n", labels);
+                                                                                    labelDepth++;
+                                                                                    labels++;
+                                                                                    forIterator[forDepth] = malloc(50);
+                                                                                    strcpy(forIterator[forDepth], var->name);
+                                                                                    forDepth++;
+                                                                                }
+         ;
+
+for_to : TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS    {
+                                                                    char* temp = addTempVar(&tempVars);
+                                                                    fprintf(quadruplesFile, "(<, %s, %s, %s)\n", forIterator[forDepth - 1], $3->label, temp);
+                                                                    labelNames[labelDepth] = malloc(20);
+                                                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                    fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n", labels);
+                                                                    labelDepth++;
+                                                                    labels++;
+                                                                }
+       ;
+
+for_loop : for_from for_to block                                                        {
+                                                                                            forDepth--;
+                                                                                            char* temp = addTempVar(&tempVars);
+                                                                                            fprintf(quadruplesFile, "(+, %s, 1, %s)\n", forIterator[forDepth], temp);
+                                                                                            fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
+                                                                                            fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                                                                            labelDepth--;
+                                                                                            labelDepth--;
+                                                                                        }
+         | for_from for_to STEP OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block  {
+                                                                                            forDepth--;
+                                                                                            char* temp = addTempVar(&tempVars);
+                                                                                            fprintf(quadruplesFile, "(+, %s, %s, %s)\n", forIterator[forDepth], $5->label, temp);
+                                                                                            fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
+                                                                                            fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                                                                            labelDepth--;
+                                                                                            labelDepth--;
+                                                                                        }
          ;
 
 while_loop : WHILE OPENING_PARENTHESIS decision CLOSING_PARENTHESIS block
@@ -885,6 +971,8 @@ logical_expression : logical_expression OR logical_conjunction  {
                                                                     $$ = malloc(sizeof(Value));
                                                                     $$->type = TYPE_BOOL;
                                                                     $$->data.i = $1->data.i || $3->data.i;
+                                                                    $$->label = addTempVar(&tempVars);
+                                                                    fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "|", $1->label, $3->label, $$->label);
                                                                 }
                    | logical_conjunction                        {
                                                                     $$ = $1;
@@ -899,6 +987,8 @@ logical_conjunction : logical_conjunction AND logical_comparison    {
                                                                         $$ = malloc(sizeof(Value));
                                                                         $$->type = TYPE_BOOL;
                                                                         $$->data.i = $1->data.i && $3->data.i;
+                                                                        $$->label = addTempVar(&tempVars);
+                                                                        fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "&", $1->label, $3->label, $$->label);
                                                                     }
                     | logical_comparison                            {
                                                                         $$ = $1;
@@ -930,6 +1020,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "==", $1->label, $3->label, $$->label);
                                                                         }
                    | logical_comparison NE mathematical_expression      {
                                                                             if ($1->type == TYPE_BOOL && $3->type == TYPE_BOOL) {
@@ -956,6 +1048,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "!=", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression LT mathematical_expression {
                                                                             if (($1->type == TYPE_INT || $1->type == TYPE_FLOAT) && ($3->type == TYPE_INT || $3->type == TYPE_FLOAT)) {
@@ -972,6 +1066,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "<", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression GT mathematical_expression {
                                                                             if (($1->type == TYPE_INT || $1->type == TYPE_FLOAT) && ($3->type == TYPE_INT || $3->type == TYPE_FLOAT)) {
@@ -988,6 +1084,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", ">", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression LE mathematical_expression {
                                                                             if (($1->type == TYPE_INT || $1->type == TYPE_FLOAT) && ($3->type == TYPE_INT || $3->type == TYPE_FLOAT)) {
@@ -1004,6 +1102,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "<=", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression GE mathematical_expression {
                                                                             if (($1->type == TYPE_INT || $1->type == TYPE_FLOAT) && ($3->type == TYPE_INT || $3->type == TYPE_FLOAT)) {
@@ -1020,6 +1120,8 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", ">=", $1->label, $3->label, $$->label);
                                                                         }
                    | mathematical_expression                            {
                                                                             $$ = $1;
@@ -1039,6 +1141,8 @@ mathematical_expression : mathematical_expression PLUS mathematical_term    {
                                                                                 else {
                                                                                     $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) + ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
                                                                                 }
+                                                                                $$->label = addTempVar(&tempVars);
+                                                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "+", $1->label, $3->label, $$->label);
                                                                             }
                         | mathematical_expression MINUS mathematical_term   {
                                                                                 if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
@@ -1053,6 +1157,8 @@ mathematical_expression : mathematical_expression PLUS mathematical_term    {
                                                                                 else {
                                                                                     $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) - ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
                                                                                 }
+                                                                                $$->label = addTempVar(&tempVars);
+                                                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "-", $1->label, $3->label, $$->label);
                                                                             }
                         | mathematical_term                                 {
                                                                                 $$ = $1;
@@ -1072,6 +1178,8 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                         else {
                                                                             $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) * ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
                                                                         }
+                                                                        $$->label = addTempVar(&tempVars);
+                                                                        fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "*", $1->label, $3->label, $$->label);
                                                                     }
                   | mathematical_term DIV mathematical_exponent     {
                                                                         if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
@@ -1090,6 +1198,8 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                         else {
                                                                             $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) / ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
                                                                         }
+                                                                        $$->label = addTempVar(&tempVars);
+                                                                        fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "/", $1->label, $3->label, $$->label);
                                                                     }
                   | mathematical_term MOD mathematical_exponent     {
                                                                         if ($1->type != TYPE_INT || $3->type != TYPE_INT) {
@@ -1103,6 +1213,8 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                         $$ = malloc(sizeof(Value));
                                                                         $$->type = TYPE_INT;
                                                                         $$->data.i = $1->data.i % $3->data.i;
+                                                                        $$->label = addTempVar(&tempVars);
+                                                                        fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "%", $1->label, $3->label, $$->label);
                                                                     }
                   | mathematical_exponent                           {
                                                                         $$ = $1;
@@ -1122,6 +1234,8 @@ mathematical_exponent : primary POW mathematical_exponent   {
                                                                 else {
                                                                     $$->data.f = pow(($1->type == TYPE_INT ? $1->data.i : $1->data.f), ($3->type == TYPE_INT ? $3->data.i : $3->data.f));
                                                                 }
+                                                                $$->label = addTempVar(&tempVars);
+                                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "^", $1->label, $3->label, $$->label);
                                                             }
                       | primary                             {
                                                                 $$ = $1;
@@ -1144,6 +1258,8 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                             else {
                                                                                 $$->data.f = -($2->data.f);
                                                                             }
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "-", $2->label, $$->label);
                                                                         }
         | NOT primary                                                   {
                                                                             if ($2->type != TYPE_BOOL) {
@@ -1153,31 +1269,47 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_BOOL;
                                                                             $$->data.i = !($2->data.i);
+                                                                            $$->label = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "!", $2->label, $$->label);
                                                                         }
         | INTEGER                                                       {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_INT;
                                                                             $$->data.i = $1;
+                                                                            int size = snprintf(NULL, 0, "%d", $1);
+                                                                            $$->label = malloc(size + 1);
+                                                                            sprintf($$->label, "%d", $1);
                                                                         }
         | FLOAT                                                         {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_FLOAT;
                                                                             $$->data.f = $1;
+                                                                            int size = snprintf(NULL, 0, "%f", $1);
+                                                                            $$->label = malloc(size + 1);
+                                                                            sprintf($$->label, "%f", $1);
                                                                         }
         | BOOL                                                          {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_BOOL;
                                                                             $$->data.i = $1;
+                                                                            $$->label = malloc($1 == 1 ? 5 : 6);
+                                                                            strcpy($$->label, $1 == 1 ? "true" : "false");
                                                                         }
         | CHAR                                                          {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_CHAR;
                                                                             $$->data.c = $1;
+                                                                            $$->label = malloc(4);
+                                                                            sprintf($$->label, "'%c'", $1);
                                                                         }
         | STRING                                                        {
                                                                             $$ = malloc(sizeof(Value));
                                                                             $$->type = TYPE_STRING;
                                                                             $$->data.s = $1;
+                                                                            $$->label = malloc(strlen($1) + 3);
+                                                                            strcpy($$->label + 1, $1);
+                                                                            $$->label[0] = '"';
+                                                                            $$->label[strlen($1) + 1] = '"';
                                                                         }
         | IDENTIFIER                                                    {
                                                                             $$ = malloc(sizeof(Value));
@@ -1213,6 +1345,8 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                                     break;
                                                                             }
                                                                             symbol->isUsed = 1;
+                                                                            $$->label = malloc(sizeof($1) + 1);
+                                                                            strcpy($$->label, $1);
                                                                         }
         | function_call                                                 {
                                                                             if ($1->type == TYPE_VOID) {
@@ -1232,6 +1366,15 @@ print_statement : PRINT OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS
 /* Subroutines */
 void yyerror(const char* s) {
     fprintf(stderr, "\nLine %d: %s\n", line, s);
+    if (symbolTableFile) {
+        fclose(symbolTableFile);
+    }
+    if (semanticAnalysisFile) {
+        fclose(semanticAnalysisFile);
+    }
+    if (quadruplesFile) {
+        fclose(quadruplesFile);
+    }
     exit(1);
 }
 
@@ -1267,15 +1410,16 @@ int main(int argc, char** argv) {
     fprintf(symbolTableVisualiser, "| %-12s | %-9s | %-12s | %-6s | %-17s |\n", "name", "kind", "value", "type", "declaration line");
     fprintf(symbolTableVisualiser, "------------------------------------------------------------------------\n");
 
-
-    line = 1;
+    quadruplesFile = fopen("Quadruples.out", "w");
+    if (quadruplesFile == NULL) {
+        printf("Error opening Quadruples.out.");
+        return 1;
+    }
+    for (int i = 0; i < 100; i++) {
+        numCases[i] = 0;
+    }
+    
     symbolTable = SymbolTable_construct();
-    numParams = 0;
-    lastSymbol = NULL;
-    numArgs = 0;
-    numCases = 0;
-    currFunc = NULL;
-    funcDepth = 0;
 
     yyparse();
     fclose(yyin);
@@ -1284,6 +1428,7 @@ int main(int argc, char** argv) {
     fclose(symbolTableFile);
     fclose(semanticAnalysisFile);
     fclose(symbolTableVisualiser);
+    fclose(quadruplesFile);
     
     return 0;
 }

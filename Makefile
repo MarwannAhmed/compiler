@@ -3,7 +3,7 @@
 all: clean build run
 
 clean:
-	rm -rf Compiler.exe Parser.tab.c Parser.tab.h lex.yy.c Parser.output .vscode
+	rm -rf Compiler.exe Parser.tab.c Parser.tab.h lex.yy.c Parser.output .vscode SymbolTable.out SemanticAnalysis.out Quadruples.out
 
 build: bison flex comp
 
@@ -17,4 +17,4 @@ flex:
 	flex.exe Lexer.l
 
 comp:
-	gcc.exe SymbolTableDefs/Symbol.c SymbolTableDefs/SymbolList.c SymbolTableDefs/ScopeSymbolTable.c SymbolTableDefs/SymbolTable.c globals.c Parser.tab.c lex.yy.c -o Compiler.exe
+	gcc.exe SymbolTableDefs/Symbol.c SymbolTableDefs/SymbolList.c SymbolTableDefs/ScopeSymbolTable.c SymbolTableDefs/SymbolTable.c globals.c utils.c Parser.tab.c lex.yy.c -o Compiler.exe

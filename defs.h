@@ -22,6 +22,7 @@ typedef enum {
 } Type;
 
 typedef struct {
+    char* label;
     Type type;
     union
     {

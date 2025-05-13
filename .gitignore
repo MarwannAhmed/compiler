@@ -5,3 +5,6 @@ lex.yy.c
 Parser.output
 src.txt
 .vscode/
+SymbolTable.out
+SemanticAnalysis.out
+Quadruples.out
