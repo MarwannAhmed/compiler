@@ -94,11 +94,12 @@ block : SCOPE_START {
                             funcDepth = funcDepth + 1;
                         }
                         for (int i = 0; i < symbolTable->size; i++) {
-                            printf("    ");
+                            fprintf(symbolTableFile, "    ");
                         }
-                        printf("Constructing new table for a new scope: %d\n", symbolTable->size);
+                        fprintf(symbolTableFile, "Constructing new table for a new scope: %d\n", symbolTable->size);
                         SymbolTable_push(symbolTable);
                         if (lastSymbol->kind == KIND_FUNC && currFunc) {
+                            fprintf(semanticAnalysisFile, "Line %d: Line %d: Invalid statement: cannot declare a function inside a function.", line);
                             yyerror("Invalid statement: cannot declare a function inside a function.");
                         }
                         if (lastSymbol->kind == KIND_FUNC && !currFunc) {
@@ -108,6 +109,7 @@ block : SCOPE_START {
                             for (int i = 0; i < numParams; i++) {
                                 Symbol* param = lastSymbol->params[i];
                                 if (ScopeSymbolTable_get(symbolTable->head, param->name)) {
+                                    fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
                                     yyerror("Invalid declaration: cannot redeclare symbol.");
                                 }
                                 char* type_str;
@@ -129,9 +131,9 @@ block : SCOPE_START {
                                         break;
                                 }
                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                    printf("    ");
+                                    fprintf(symbolTableFile, "    ");
                                 }
-                                printf("Declared a function parameter \"%s\" of type \"%s\"\n", param->name, type_str);
+                                fprintf(symbolTableFile, "Declared a function parameter \"%s\" of type \"%s\"\n", param->name, type_str);
                                 Symbol* symbol = Symbol_construct(param->name, param->kind, param->isInit, line, param->value, NULL, 0);
                                 SymbolTable_insert(symbolTable, symbol);
                             }
@@ -143,9 +145,9 @@ block : SCOPE_START {
                             currFunc = NULL;
                         }
                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                            printf("    ");
+                            fprintf(symbolTableFile, "    ");
                         }
-                        printf("Destroying table for scope: %d\n", symbolTable->size - 1);
+                        fprintf(symbolTableFile, "Destroying table for scope: %d\n", symbolTable->size - 1);
                         SymbolTable_pop(symbolTable);
                         if (currFunc) {
                             funcDepth = funcDepth - 1;
@@ -155,6 +157,7 @@ block : SCOPE_START {
 
 declaration : TYPE IDENTIFIER                           {
                                                             if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
                                                                 yyerror("Invalid declaration: cannot redeclare symbol.");
                                                             }
                                                             Value value;
@@ -174,77 +177,85 @@ declaration : TYPE IDENTIFIER                           {
                                                                 value.type = TYPE_STRING;
                                                             }
                                                             else {
+                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a variable of unknown type.", line);
                                                                 yyerror("Invalid declaration: cannot create a variable of unknown type.");
                                                             }
                                                             for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                printf("    ");
+                                                                fprintf(symbolTableFile, "    ");
                                                             }
-                                                            printf("Declared a variable \"%s\" of type \"%s\"\n", $2, $1);
+                                                            fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\"\n", $2, $1);
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 0, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
                                                         }
             | TYPE IDENTIFIER ASSIGN expression         {
                                                             if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
                                                                 yyerror("Invalid declaration: cannot redeclare symbol.");
                                                             }
                                                             Value value;
                                                             if (strcmp($1, "bool") == 0) {
                                                                 value.type = TYPE_BOOL;
                                                                 if ($4->type != TYPE_BOOL) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-boolean expression to \"bool\" variable.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-boolean expression to \"bool\" variable.");
                                                                 }
                                                                 value.data.i = $4->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.i == 1 ? "true" : "false");
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.i == 1 ? "true" : "false");
                                                             }
                                                             else if (strcmp($1, "int") == 0) {
                                                                 value.type = TYPE_INT;
                                                                 if ($4->type != TYPE_INT && $4->type != TYPE_FLOAT) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-numeric expression to \"int\" variable.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-numeric expression to \"int\" variable.");
                                                                 }
                                                                 value.data.i = $4->type == TYPE_INT ? $4->data.i : (int) $4->data.f;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %d\n", $2, $1, value.data.i);
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %d\n", $2, $1, value.data.i);
                                                             }
                                                             else if (strcmp($1, "float") == 0) {
                                                                 value.type = TYPE_FLOAT;
                                                                 if ($4->type != TYPE_INT && $4->type != TYPE_FLOAT) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-numeric expression to \"float\" variable.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-numeric expression to \"float\" variable.");
                                                                 }
                                                                 value.data.f = $4->type == TYPE_FLOAT ? $4->data.f : (float) $4->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %f\n", $2, $1, value.data.f);
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %f\n", $2, $1, value.data.f);
                                                             }
                                                             else if (strcmp($1, "char") == 0) {
                                                                 value.type = TYPE_CHAR;
                                                                 if ($4->type != TYPE_CHAR) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-character expression to \"char\" variable.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-character expression to \"char\" variable.");
                                                                 }
                                                                 value.data.c = $4->data.c;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %c\n", $2, $1, value.data.c);
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %c\n", $2, $1, value.data.c);
                                                             }
                                                             else if (strcmp($1, "string") == 0) {
                                                                 value.type = TYPE_STRING;
                                                                 if ($4->type != TYPE_STRING) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-string expression to \"string\" variable.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-string expression to \"string\" variable.");
                                                                 }
                                                                 value.data.s = $4->data.s;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.s);
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.s);
                                                             }
                                                             else {
+                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a variable of unknown type.", line);
                                                                 yyerror("Invalid declaration: cannot create a variable of unknown type.");
                                                             }
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
@@ -253,65 +264,72 @@ declaration : TYPE IDENTIFIER                           {
                                                         }
             | CONST TYPE IDENTIFIER ASSIGN expression   {
                                                             if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
                                                                 yyerror("Invalid declaration: cannot redeclare symbol.");
                                                             }
                                                             Value value;
                                                             if (strcmp($2, "bool") == 0) {
                                                                 value.type = TYPE_BOOL;
                                                                 if ($5->type != TYPE_BOOL) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-boolean expression to \"bool\" constant.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-boolean expression to \"bool\" constant.");
                                                                 }
                                                                 value.data.i = $5->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.i == 1 ? "true" : "false");
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.i == 1 ? "true" : "false");
                                                             }
                                                             else if (strcmp($2, "int") == 0) {
                                                                 value.type = TYPE_INT;
                                                                 if ($5->type != TYPE_INT && $5->type != TYPE_FLOAT) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-numeric expression to \"int\" constant.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-numeric expression to \"int\" constant.");
                                                                 }
                                                                 value.data.i = $5->type == TYPE_INT ? $5->data.i : (int) $5->data.f;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %d\n", $3, $2, value.data.i);
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %d\n", $3, $2, value.data.i);
                                                             }
                                                             else if (strcmp($2, "float") == 0) {
                                                                 value.type = TYPE_FLOAT;
                                                                 if ($5->type != TYPE_INT && $5->type != TYPE_FLOAT) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-numeric expression to \"float\" constant.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-numeric expression to \"float\" constant.");
                                                                 }
                                                                 value.data.f = $5->type == TYPE_FLOAT ? $5->data.f : (float) $5->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %f\n", $3, $2, value.data.f);
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %f\n", $3, $2, value.data.f);
                                                             }
                                                             else if (strcmp($2, "char") == 0) {
                                                                 value.type = TYPE_CHAR;
                                                                 if ($5->type != TYPE_CHAR) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-character expression to \"char\" constant.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-character expression to \"char\" constant.");
                                                                 }
                                                                 value.data.c = $5->data.c;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %c\n", $3, $2, value.data.c);
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %c\n", $3, $2, value.data.c);
                                                             }
                                                             else if (strcmp($2, "string") == 0) {
                                                                 value.type = TYPE_STRING;
                                                                 if ($5->type != TYPE_STRING) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign non-string expression to \"string\" constant.", line);
                                                                     yyerror("Invalid assignment: cannot assign non-string expression to \"string\" constant.");
                                                                 }
                                                                 value.data.s = $5->data.s;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.s);
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.s);
                                                             }
                                                             else {
+                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a constant of unknown type.", line);
                                                                 yyerror("Invalid declaration: cannot create a constant of unknown type.");
                                                             }
                                                             Symbol* symbol = Symbol_construct($2, KIND_CONST, 1, line, value, NULL, 0);
@@ -323,12 +341,15 @@ declaration : TYPE IDENTIFIER                           {
 assignment : IDENTIFIER ASSIGN expression   {
                                                 Symbol* var = SymbolTable_get(symbolTable, $1);
                                                 if (!var) {
+                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
                                                     yyerror("Invalid expression: cannot find symbol.");
                                                 }
                                                 if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
+                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign to a constant or a function.", line);
                                                     yyerror("Invalid assignment: cannot assign to a constant or a function.");
                                                 }
                                                 if ($3->type != var->value.type) {
+                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: type of variable does not match type of expression.", line);
                                                     yyerror("Invalid assignment: type of variable does not match type of expression.");
                                                 }
                                                 switch (var->value.type) {
@@ -353,6 +374,7 @@ assignment : IDENTIFIER ASSIGN expression   {
 
 decision : expression   {
                             if ($1->type != TYPE_BOOL) {
+                                fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-boolean expression as a decision expression.", line);
                                 yyerror("Invalid statement: cannot use a non-boolean expression as a decision expression.");
                             }
                             $$ = $1;
@@ -360,6 +382,7 @@ decision : expression   {
 
 iterator : expression   {
                             if ($1->type != TYPE_INT) {
+                                fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer expression as an iterator expression.", line);
                                 yyerror("Invalid statement: cannot use a non-integer expression as an iterator expression.");
                             }
                             $$ = $1;
@@ -372,6 +395,7 @@ if_statement : IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS block
 switch_statement : SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS SCOPE_START case_statements SCOPE_END              {
                                                                                                                                     for (int i = 0; i < numCases; i++) {
                                                                                                                                         if ($3->type != ($6)[i]->type) {
+                                                                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
                                                                                                                                             yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
                                                                                                                                         }
                                                                                                                                     }
@@ -379,6 +403,7 @@ switch_statement : SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS SCO
                  | SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS SCOPE_START case_statements default_case SCOPE_END {
                                                                                                                                     for (int i = 0; i < numCases; i++) {
                                                                                                                                         if ($3->type != ($6)[i]->type) {
+                                                                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
                                                                                                                                             yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
                                                                                                                                         }
                                                                                                                                     }
@@ -411,12 +436,15 @@ default_case : DEFAULT block
 for_loop : FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block                                                       {
                                                                                                                                                                                                     Symbol* var = SymbolTable_get(symbolTable, $2);
                                                                                                                                                                                                     if (!var) {
+                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
                                                                                                                                                                                                         yyerror("Invalid expression: cannot find symbol.");
                                                                                                                                                                                                     }
                                                                                                                                                                                                     if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
+                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statemen: cannot use a constant or a function as a for loop iterator.", line);
                                                                                                                                                                                                         yyerror("Invalid statemen: cannot use a constant or a function as a for loop iterator.");
                                                                                                                                                                                                     }
                                                                                                                                                                                                     if (var->value.type != TYPE_INT) {
+                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer variable as a for loop iterator.", line);
                                                                                                                                                                                                         yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
                                                                                                                                                                                                     }
                                                                                                                                                                                                     var->isUsed = 1;
@@ -424,12 +452,15 @@ for_loop : FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS 
          | FOR IDENTIFIER FROM OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS STEP OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block {
                                                                                                                                                                                                     Symbol* var = SymbolTable_get(symbolTable, $2);
                                                                                                                                                                                                     if (!var) {
+                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
                                                                                                                                                                                                         yyerror("Invalid expression: cannot find symbol.");
                                                                                                                                                                                                     }
                                                                                                                                                                                                     if (var->kind == KIND_FUNC || var->kind == KIND_CONST) {
+                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statemen: cannot use a constant or a function as a for loop iterator.", line);
                                                                                                                                                                                                         yyerror("Invalid statemen: cannot use a constant or a function as a for loop iterator.");
                                                                                                                                                                                                     }
                                                                                                                                                                                                     if (var->value.type != TYPE_INT) {
+                                                                                                                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a non-integer variable as a for loop iterator.", line);
                                                                                                                                                                                                         yyerror("Invalid statement: cannot use a non-integer variable as a for loop iterator.");
                                                                                                                                                                                                     }
                                                                                                                                                                                                     var->isUsed = 1;
@@ -444,15 +475,16 @@ repeat_loop : REPEAT block UNTIL OPENING_PARENTHESIS decision CLOSING_PARENTHESI
 
 function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSING_PARENTHESIS   {
                                                                                                     if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
                                                                                                         yyerror("Invalid declaration: cannot redeclare symbol.");
                                                                                                     }
                                                                                                     Value value;
                                                                                                     value.type = TYPE_VOID;
                                                                                                     value.data.i = 0;
                                                                                                     for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                        printf("    ");
+                                                                                                        fprintf(symbolTableFile, "    ");
                                                                                                     }
-                                                                                                    printf("Declared a function \"%s\" of type \"void\" with %d parameters.\n", $2, numParams);
+                                                                                                    fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\" with %d parameters.\n", $2, numParams);
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     lastSymbol = symbol;
@@ -460,6 +492,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                        block
                      | TYPE IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSING_PARENTHESIS   {
                                                                                                     if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
                                                                                                         yyerror("Invalid declaration: cannot redeclare symbol.");
                                                                                                     }
                                                                                                     Value value;
@@ -467,43 +500,44 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                         value.type = TYPE_BOOL;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else if (strcmp($1, "int") == 0) {
                                                                                                         value.type = TYPE_INT;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else if (strcmp($1, "float") == 0) {
                                                                                                         value.type = TYPE_FLOAT;
                                                                                                         value.data.f = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else if (strcmp($1, "char") == 0) {
                                                                                                         value.type = TYPE_CHAR;
                                                                                                         value.data.c = '0';
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else if (strcmp($1, "string") == 0) {
                                                                                                         value.type = TYPE_STRING;
                                                                                                         value.data.s = "";
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else {
+                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a function of unknown type.", line);
                                                                                                         yyerror("Invalid declaration: cannot create a function of unknown type.");
                                                                                                     }
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
@@ -513,15 +547,16 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                        block
                      | VOID IDENTIFIER OPENING_PARENTHESIS CLOSING_PARENTHESIS                  {
                                                                                                     if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
                                                                                                         yyerror("Invalid declaration: cannot redeclare symbol.");
                                                                                                     }
                                                                                                     Value value;
                                                                                                     value.type = TYPE_VOID;
                                                                                                     value.data.i = 0;
                                                                                                     for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                        printf("    ");
+                                                                                                        fprintf(symbolTableFile, "    ");
                                                                                                     }
-                                                                                                    printf("Declared a function \"%s\" of type \"void\"\n", $2);
+                                                                                                    fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\"\n", $2);
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     lastSymbol = symbol;
@@ -529,6 +564,7 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                        block
                      | TYPE IDENTIFIER OPENING_PARENTHESIS CLOSING_PARENTHESIS                  {
                                                                                                     if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
                                                                                                         yyerror("Invalid declaration: cannot redeclare symbol.");
                                                                                                     }
                                                                                                     Value value;
@@ -536,43 +572,44 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                         value.type = TYPE_BOOL;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else if (strcmp($1, "int") == 0) {
                                                                                                         value.type = TYPE_INT;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else if (strcmp($1, "float") == 0) {
                                                                                                         value.type = TYPE_FLOAT;
                                                                                                         value.data.f = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else if (strcmp($1, "char") == 0) {
                                                                                                         value.type = TYPE_CHAR;
                                                                                                         value.data.c = '0';
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else if (strcmp($1, "string") == 0) {
                                                                                                         value.type = TYPE_STRING;
                                                                                                         value.data.s = "";
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else {
+                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a function of unknown type.", line);
                                                                                                         yyerror("Invalid declaration: cannot create a function of unknown type.");
                                                                                                     }
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
@@ -620,6 +657,7 @@ parameter : TYPE IDENTIFIER {
                                     value.data.s = "";
                                 }
                                 else {
+                                    fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a parameter of unknown type.", line);
                                     yyerror("Invalid declaration: cannot create a parameter of unknown type.");
                                 }
                                 $$ = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
@@ -628,12 +666,15 @@ parameter : TYPE IDENTIFIER {
 
 return_statement : RETURN expression    {
                                             if (!currFunc) {
+                                                fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a return statement outside a function.", line);
                                                 yyerror("Invalid statement: cannot use a return statement outside a function.");
                                             }
                                             if (currFunc->value.type == TYPE_VOID) {
+                                                fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot use a return statement in a \"void\" function.", line);
                                                 yyerror("Invalid statement: cannot use a return statement in a \"void\" function.");
                                             }
                                             if ($2->type != currFunc->value.type) {
+                                                fprintf(semanticAnalysisFile, "Line %d: Invalid statement: returned expression does not match function return type.", line);
                                                 yyerror("Invalid statement: returned expression does not match function return type.");
                                             }
                                         }
@@ -642,17 +683,21 @@ return_statement : RETURN expression    {
 function_call : IDENTIFIER OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS    {
                                                                                         Symbol* func = SymbolTable_get(symbolTable, $1);
                                                                                         if (!func) {
+                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
                                                                                             yyerror("Invalid expression: cannot find symbol.");
                                                                                         }
                                                                                         if (func->kind == KIND_VAR || func->kind == KIND_CONST) {
+                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot use a variable or constant as a function.", line);
                                                                                             yyerror("Invalid expression: cannot use a variable or constant as a function.");
                                                                                         }
                                                                                         if (numArgs != func->numParams) {
+                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: number of arguments is not equal to number of parameters.", line);
                                                                                             yyerror("Invalid expression: number of arguments is not equal to number of parameters.");
                                                                                         }
                                                                                         for (int i = 0; i < numArgs; i++) {
                                                                                             Symbol* param = func->params[i];
                                                                                             if (($3)[i]->type != param->value.type) {
+                                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: types of arguments do not match types of parameters.", line);
                                                                                                 yyerror("Invalid expression: types of arguments do not match types of parameters.");
                                                                                             }
                                                                                         }
@@ -683,9 +728,11 @@ function_call : IDENTIFIER OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS
               | IDENTIFIER OPENING_PARENTHESIS CLOSING_PARENTHESIS                  {
                                                                                         Symbol* func = SymbolTable_get(symbolTable, $1);
                                                                                         if (!func) {
+                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
                                                                                             yyerror("Invalid expression: cannot find symbol.");
                                                                                         }
                                                                                         if (func->kind == KIND_VAR || func->kind == KIND_CONST) {
+                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot use a variable or constant as a function.", line);
                                                                                             yyerror("Invalid expression: cannot use a variable or constant as a function.");
                                                                                         }
                                                                                         $$ = malloc(sizeof(Value));
@@ -741,6 +788,7 @@ expression : logical_expression {
 
 logical_expression : logical_expression OR logical_conjunction  {
                                                                     if ($1->type != TYPE_BOOL || $3->type != TYPE_BOOL) {
+                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform a disjunction operation between non-boolean expressions.", line);
                                                                         yyerror("Invalid expression: cannot perform a disjunction operation between non-boolean expressions.");
                                                                     }
                                                                     $$ = malloc(sizeof(Value));
@@ -754,6 +802,7 @@ logical_expression : logical_expression OR logical_conjunction  {
 
 logical_conjunction : logical_conjunction AND logical_comparison    {
                                                                         if ($1->type != TYPE_BOOL || $3->type != TYPE_BOOL) {
+                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform a conjunction operation between non-boolean expressions.", line);
                                                                             yyerror("Invalid expression: cannot perform a conjunction operation between non-boolean expressions.");
                                                                         }
                                                                         $$ = malloc(sizeof(Value));
@@ -787,6 +836,7 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 $$->data.i = strcmp($1->data.s, $3->data.s) == 0;
                                                                             }
                                                                             else {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between different-typed expressions.");
                                                                             }
                                                                         }
@@ -812,6 +862,7 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 $$->data.i = strcmp($1->data.s, $3->data.s) != 0;
                                                                             }
                                                                             else {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between different-typed expressions.");
                                                                             }
                                                                         }
@@ -827,6 +878,7 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 $$->data.i = $1->data.c < $3->data.c;
                                                                             }
                                                                             else {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
                                                                         }
@@ -842,6 +894,7 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 $$->data.i = $1->data.c > $3->data.c;
                                                                             }
                                                                             else {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
                                                                         }
@@ -857,6 +910,7 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 $$->data.i = $1->data.c <= $3->data.c;
                                                                             }
                                                                             else {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
                                                                         }
@@ -872,6 +926,7 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
                                                                                 $$->data.i = $1->data.c >= $3->data.c;
                                                                             }
                                                                             else {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.", line);
                                                                                 yyerror("Invalid expression: cannot compare between boolean expressions, string expressions, or different-typed expressions.");
                                                                             }
                                                                         }
@@ -882,6 +937,7 @@ logical_comparison : logical_comparison EQ mathematical_expression      {
 
 mathematical_expression : mathematical_expression PLUS mathematical_term    {
                                                                                 if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
+                                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform an addition operation between non-numeric expressions.", line);
                                                                                     yyerror("Invalid expression: cannot perform an addition operation between non-numeric expressions.");
                                                                                 }
                                                                                 $$ = malloc(sizeof(Value));
@@ -895,6 +951,7 @@ mathematical_expression : mathematical_expression PLUS mathematical_term    {
                                                                             }
                         | mathematical_expression MINUS mathematical_term   {
                                                                                 if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
+                                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform a subtraction operation between non-numeric expressions.", line);
                                                                                     yyerror("Invalid expression: cannot perform a subtraction operation between non-numeric expressions.");
                                                                                 }
                                                                                 $$ = malloc(sizeof(Value));
@@ -913,6 +970,7 @@ mathematical_expression : mathematical_expression PLUS mathematical_term    {
 
 mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                         if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
+                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform a multiplication operation between non-numeric expressions.", line);
                                                                             yyerror("Invalid expression: cannot perform a multiplication operation between non-numeric expressions.");
                                                                         }
                                                                         $$ = malloc(sizeof(Value));
@@ -926,9 +984,11 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                     }
                   | mathematical_term DIV mathematical_exponent     {
                                                                         if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
+                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform a division operation between non-numeric expressions.", line);
                                                                             yyerror("Invalid expression: cannot perform a division operation between non-numeric expressions.");
                                                                         }
                                                                         if (($3->type == TYPE_INT && $3->data.i == 0) || ($3->type == TYPE_FLOAT && $3->data.f == 0)) {
+                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot divide by zero.", line);
                                                                             yyerror("Invalid expression: cannot divide by zero.");
                                                                         }
                                                                         $$ = malloc(sizeof(Value));
@@ -942,9 +1002,11 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
                                                                     }
                   | mathematical_term MOD mathematical_exponent     {
                                                                         if ($1->type != TYPE_INT || $3->type != TYPE_INT) {
+                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform a remainder operation between non-integer expressions.", line);
                                                                             yyerror("Invalid expression: cannot perform a remainder operation between non-integer expressions.");
                                                                         }
                                                                         if ($3->data.i == 0) {
+                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot divide by zero.", line);
                                                                             yyerror("Invalid expression: cannot divide by zero.");
                                                                         }
                                                                         $$ = malloc(sizeof(Value));
@@ -958,6 +1020,7 @@ mathematical_term : mathematical_term MULT mathematical_exponent    {
 
 mathematical_exponent : primary POW mathematical_exponent   {
                                                                 if (($1->type != TYPE_INT && $1->type != TYPE_FLOAT) || ($3->type != TYPE_INT && $3->type != TYPE_FLOAT)) {
+                                                                    fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform an exponentiation operation between non-numeric expressions.", line);
                                                                     yyerror("Invalid expression: cannot perform an exponentiation operation between non-numeric expressions.");
                                                                 }
                                                                 $$ = malloc(sizeof(Value));
@@ -979,6 +1042,7 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                         }
         | MINUS primary                                                 {
                                                                             if ($2->type != TYPE_INT && $2->type != TYPE_FLOAT) {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform a negation operation on a non-numeric expression.", line);
                                                                                 yyerror("Invalid expression: cannot perform a negation operation on a non-numeric expression.");
                                                                             }
                                                                             $$ = malloc(sizeof(Value));
@@ -992,6 +1056,7 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                         }
         | NOT primary                                                   {
                                                                             if ($2->type != TYPE_BOOL) {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot perform an inversion operation on a non-boolean expression.", line);
                                                                                 yyerror("Invalid expression: cannot perform an inversion operation on a non-boolean expression.");
                                                                             }
                                                                             $$ = malloc(sizeof(Value));
@@ -1027,12 +1092,15 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                             $$ = malloc(sizeof(Value));
                                                                             Symbol* symbol = SymbolTable_get(symbolTable, $1);
                                                                             if (!symbol) {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot find symbol.", line);
                                                                                 yyerror("Invalid expression: cannot find symbol.");
                                                                             }
                                                                             if (symbol->kind != KIND_VAR && symbol->kind != KIND_CONST) {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot call function without argument list.", line);
                                                                                 yyerror("Invalid expression: cannot call function without argument list.");
                                                                             }
                                                                             if (!(symbol->isInit)) {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot use an uninitialized variable.", line);
                                                                                 yyerror("Invalid expression: cannot use an uninitialized variable.");
                                                                             }
                                                                             $$->type = symbol->value.type;
@@ -1057,6 +1125,7 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                         }
         | function_call                                                 {
                                                                             if ($1->type == TYPE_VOID) {
+                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot call a \"void\" function.", line);
                                                                                 yyerror("Invalid expression: cannot call a \"void\" function.");
                                                                             }
                                                                             $$ = $1;
@@ -1086,6 +1155,16 @@ int main(int argc, char** argv) {
         yyin = stdin;
     }
 
+    symbolTableFile = fopen("SymbolTable.out", "w");
+    if (symbolTableFile == NULL) {
+        printf("Error opening SymbolTable.out.");
+        return 1;
+    }
+    semanticAnalysisFile = fopen("SemanticAnalysis.out", "w");
+    if (semanticAnalysisFile == NULL) {
+        printf("Error opening SemanticAnalysis.out.");
+        return 1;
+    }
     line = 1;
     symbolTable = SymbolTable_construct();
     numParams = 0;
@@ -1099,6 +1178,8 @@ int main(int argc, char** argv) {
     fclose(yyin);
 
     SymbolTable_destroy(symbolTable);
+    fclose(symbolTableFile);
+    fclose(semanticAnalysisFile);
     
     return 0;
 }
