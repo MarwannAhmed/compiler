@@ -640,7 +640,31 @@ for_loop : for_from for_to block                                                
                                                                                         }
          ;
 
-while_loop : WHILE OPENING_PARENTHESIS decision CLOSING_PARENTHESIS block
+while_header : WHILE            {
+                                    labelNames[labelDepth] = malloc(20);
+                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                    fprintf(quadruplesFile, "LABEL%d:\n", labels);
+                                    labelDepth++;
+                                    labels++;
+                                }
+               while_expression
+             ;
+
+while_expression : OPENING_PARENTHESIS decision CLOSING_PARENTHESIS {
+                                                                        labelNames[labelDepth] = malloc(20);
+                                                                        sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                        fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n", labels);
+                                                                        labelDepth++;
+                                                                        labels++;
+                                                                    }
+                 ;
+
+while_loop : while_header block {
+                                    fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
+                                    fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                    labelDepth--;
+                                    labelDepth--;
+                                }
            ;
 
 repeat_loop : REPEAT block UNTIL OPENING_PARENTHESIS decision CLOSING_PARENTHESIS
