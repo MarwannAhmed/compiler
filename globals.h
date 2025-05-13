@@ -3,6 +3,7 @@
 
 #include "SymbolTableDefs/SymbolTable.h"
 
+extern int line;
 extern SymbolTable* symbolTable;
 extern int numParams;
 extern Symbol* lastSymbol;

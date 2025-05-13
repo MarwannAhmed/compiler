@@ -1,5 +1,6 @@
 #include "globals.h"
 
+int line = 1;
 SymbolTable* symbolTable = NULL;
 int numParams = 0;
 Symbol* lastSymbol = NULL;
