@@ -622,8 +622,7 @@ for_to : TO OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS    {
 
 for_loop : for_from for_to block                                                        {
                                                                                             forDepth--;
-                                                                                            char* temp = addTempVar(&tempVars);
-                                                                                            fprintf(quadruplesFile, "(+, %s, 1, %s)\n", forIterator[forDepth], temp);
+                                                                                            fprintf(quadruplesFile, "(+, %s, 1, %s)\n", forIterator[forDepth], forIterator[forDepth]);
                                                                                             fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
                                                                                             fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
                                                                                             labelDepth--;
@@ -631,8 +630,7 @@ for_loop : for_from for_to block                                                
                                                                                         }
          | for_from for_to STEP OPENING_PARENTHESIS iterator CLOSING_PARENTHESIS block  {
                                                                                             forDepth--;
-                                                                                            char* temp = addTempVar(&tempVars);
-                                                                                            fprintf(quadruplesFile, "(+, %s, %s, %s)\n", forIterator[forDepth], $5->label, temp);
+                                                                                            fprintf(quadruplesFile, "(+, %s, %s, %s)\n", forIterator[forDepth], $5->label, forIterator[forDepth]);
                                                                                             fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
                                                                                             fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
                                                                                             labelDepth--;
