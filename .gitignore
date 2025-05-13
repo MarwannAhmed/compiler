@@ -7,3 +7,4 @@ src.txt
 .vscode/
 SymbolTable.out
 SemanticAnalysis.out
+Quadruples.out
