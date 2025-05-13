@@ -667,7 +667,17 @@ while_loop : while_header block {
                                 }
            ;
 
-repeat_loop : REPEAT block UNTIL OPENING_PARENTHESIS decision CLOSING_PARENTHESIS
+repeat_loop : REPEAT                                                        {
+                                                                                labelNames[labelDepth] = malloc(20);
+                                                                                sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                                fprintf(quadruplesFile, "LABEL%d:\n", labels);
+                                                                                labelDepth++;
+                                                                                labels++;
+                                                                            }
+              block UNTIL OPENING_PARENTHESIS decision CLOSING_PARENTHESIS  {
+                                                                                fprintf(quadruplesFile, "(JZ, %s, N/A, N/A)\n", labelNames[labelDepth - 1]);
+                                                                                labelDepth--;
+                                                                            }
             ;
 
 function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSING_PARENTHESIS   {
