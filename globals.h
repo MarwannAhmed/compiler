@@ -11,10 +11,14 @@ extern SymbolTable* symbolTable;
 extern int numParams;
 extern Symbol* lastSymbol;
 extern int numArgs;
-extern int numCases;
+extern int numCases[100];
 extern Symbol* currFunc;
 extern int funcDepth;
 extern int tempVars;
 extern int labels;
-
+extern Value* switchExpr[100];
+extern int switchDepth;
+extern char* labelNames[1000];
+extern int labelDepth;
+extern int switchLabel[100];
 #endif

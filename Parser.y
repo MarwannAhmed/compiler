@@ -65,7 +65,7 @@
 %token NE
 %type<p> parameter
 %type<pl> parameter_list
-%type <v> expression mathematical_expression mathematical_term mathematical_exponent logical_expression logical_conjunction logical_comparison primary argument function_call case_statement decision iterator
+%type <v> expression mathematical_expression mathematical_term mathematical_exponent logical_expression logical_conjunction logical_comparison primary argument function_call case_statement decision iterator switch_header case_header
 %type<vl> argument_list case_statements
 /* Production Rules */
 %%
@@ -99,14 +99,14 @@ block : SCOPE_START {
                         }
                         fprintf(symbolTableFile, "Constructing new table for a new scope: %d\n", symbolTable->size);
                         SymbolTable_push(symbolTable);
-                        if (lastSymbol->kind == KIND_FUNC && currFunc) {
-                            fprintf(semanticAnalysisFile, "Line %d: Line %d: Invalid statement: cannot declare a function inside a function.", line);
+                        if (lastSymbol && lastSymbol->kind == KIND_FUNC && currFunc) {
+                            fprintf(semanticAnalysisFile, "Line %d: Invalid statement: cannot declare a function inside a function.", line);
                             yyerror("Invalid statement: cannot declare a function inside a function.");
                         }
-                        if (lastSymbol->kind == KIND_FUNC && !currFunc) {
+                        if (lastSymbol && lastSymbol->kind == KIND_FUNC && !currFunc) {
                             currFunc = lastSymbol;
                         }
-                        if (lastSymbol->kind == KIND_FUNC && lastSymbol->numParams > 0) {
+                        if (lastSymbol && lastSymbol->kind == KIND_FUNC && lastSymbol->numParams > 0) {
                             for (int i = 0; i < numParams; i++) {
                                 Symbol* param = lastSymbol->params[i];
                                 if (ScopeSymbolTable_get(symbolTable->head, param->name)) {
@@ -262,7 +262,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
-                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n\n", "=", $4->label, $2);
+                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $4->label, $2);
                                                             tempVars = 0;
                                                         }
             | CONST TYPE IDENTIFIER ASSIGN expression   {
@@ -335,10 +335,10 @@ declaration : TYPE IDENTIFIER                           {
                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a constant of unknown type.", line);
                                                                 yyerror("Invalid declaration: cannot create a constant of unknown type.");
                                                             }
-                                                            Symbol* symbol = Symbol_construct($2, KIND_CONST, 1, line, value, NULL, 0);
+                                                            Symbol* symbol = Symbol_construct($3, KIND_CONST, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
-                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n\n", "=", $5->label, $3);
+                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $5->label, $3);
                                                             tempVars = 0;
                                                         }
             ;
@@ -353,7 +353,7 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                     fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: cannot assign to a constant or a function.", line);
                                                     yyerror("Invalid assignment: cannot assign to a constant or a function.");
                                                 }
-                                                if ($3->type != var->value.type) {
+                                                if ((($3->type == TYPE_INT || $3->type == TYPE_FLOAT) && (var->value.type != TYPE_INT && var->value.type != TYPE_FLOAT)) || (($3->type == TYPE_BOOL || $3->type == TYPE_STRING || $3->type == TYPE_CHAR) && ($3->type != var->value.type))) {
                                                     fprintf(semanticAnalysisFile, "Line %d: Invalid assignment: type of variable does not match type of expression.", line);
                                                     yyerror("Invalid assignment: type of variable does not match type of expression.");
                                                 }
@@ -374,7 +374,7 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                         var->value.data.s = $3->data.s;
                                                         break;
                                                 }
-                                                fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n\n", "=", $3->label, $1);
+                                                fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "=", $3->label, $1);
                                                 tempVars = 0;
                                             }
            ;
@@ -396,61 +396,104 @@ iterator : expression   {
                             $$ = $1;
                         }
 
-if_header : IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS                 {
-                                                                                    fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n\n", labels);
-                                                                                    labels++;
-                                                                                }
+if_header : IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS {
+                                                                    labelNames[labelDepth] = malloc(20);
+                                                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                    labels++;
+                                                                    labelDepth++;
+                                                                    labelNames[labelDepth] = malloc(20);
+                                                                    sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                    fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n", labels);
+                                                                    labels++;
+                                                                    labelDepth++;
+                                                                }
           ;
 
-if_statement : if_header block              {
-                                                fprintf(quadruplesFile, "LABEL%d:\n\n", labels - 1);
-                                            }
-             | if_header block ELSE         {
-                                                fprintf(quadruplesFile, "(JMP, LABEL%d, N/A, N/A)\n\n", labels);
-                                                labels++;
-                                                fprintf(quadruplesFile, "LABEL%d:\n\n", labels - 2);
-                                            }
-               block                        {
-                                                fprintf(quadruplesFile, "LABEL%d:\n\n", labels - 1);
-                                            }
+if_statement : if_header block      {
+                                        fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                        labelDepth--;
+                                        labelDepth--;
+                                    }
+             | if_header block ELSE {
+                                        fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[labelDepth - 2]);
+                                        fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                    }
+               block                {
+                                        fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 2]);
+                                        labelDepth--;
+                                        labelDepth--;
+                                    }
              ;
 
-switch_statement : SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS SCOPE_START case_statements SCOPE_END              {
-                                                                                                                                    for (int i = 0; i < numCases; i++) {
-                                                                                                                                        if ($3->type != ($6)[i]->type) {
-                                                                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
-                                                                                                                                            yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
-                                                                                                                                        }
-                                                                                                                                    }
-                                                                                                                                }
-                 | SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS SCOPE_START case_statements default_case SCOPE_END {
-                                                                                                                                    for (int i = 0; i < numCases; i++) {
-                                                                                                                                        if ($3->type != ($6)[i]->type) {
-                                                                                                                                            fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
-                                                                                                                                            yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
-                                                                                                                                        }
-                                                                                                                                    }
-                                                                                                                                }
+switch_header : SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS   {
+                                                                                switchExpr[switchDepth] = malloc(sizeof(Value));
+                                                                                switchExpr[switchDepth] = $3;
+                                                                                switchLabel[switchDepth] = labelDepth;
+                                                                                switchDepth++;
+                                                                                labelNames[labelDepth] = malloc(20);
+                                                                                sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                                labelDepth++;
+                                                                                labels++;
+                                                                                $$ = $3;
+                                                                            }
+              ;
+
+switch_statement : switch_header SCOPE_START case_statements SCOPE_END              {
+                                                                                        for (int i = 0; i < numCases[switchDepth]; i++) {
+                                                                                            if ($1->type != ($3)[i]->type) {
+                                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
+                                                                                                yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
+                                                                                            }
+                                                                                        }
+                                                                                        switchDepth--;
+                                                                                        labelDepth--;
+                                                                                        fprintf(quadruplesFile, "%s:\n", labelNames[switchLabel[switchDepth]]);
+                                                                                    }
+                 | switch_header SCOPE_START case_statements default_case SCOPE_END {
+                                                                                        for (int i = 0; i < numCases[switchDepth]; i++) {
+                                                                                            if ($1->type != ($3)[i]->type) {
+                                                                                                fprintf(semanticAnalysisFile, "Line %d: Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.", line);
+                                                                                                yyerror("Invalid case statement: type of expression inside the switch statement does not match the types of expressions inside the case statements.");
+                                                                                            }
+                                                                                        }
+                                                                                        switchDepth--;
+                                                                                        labelDepth--;
+                                                                                        fprintf(quadruplesFile, "%s:\n", labelNames[switchLabel[switchDepth]]);
+                                                                                    }
                  ;
 
 case_statements : case_statements case_statement    {
-                                                        numCases = numCases + 1;
-                                                        $$ = malloc(numCases * sizeof(Value*));
-                                                        for (int i = 0; i < numCases - 1; i++) {
+                                                        numCases[switchDepth] = numCases[switchDepth] + 1;
+                                                        $$ = malloc(numCases[switchDepth] * sizeof(Value*));
+                                                        for (int i = 0; i < numCases[switchDepth] - 1; i++) {
                                                             ($$)[i] = ($1)[i];
                                                         }
-                                                        ($$)[numCases - 1] = $2;
+                                                        ($$)[numCases[switchDepth] - 1] = $2;
                                                     }
                 | case_statement                    {
-                                                        numCases = 1;
+                                                        numCases[switchDepth] = 1;
                                                         $$ = malloc(sizeof(Value*));
                                                         ($$)[0] = $1;
                                                     }
                 ;
 
-case_statement : CASE OPENING_PARENTHESIS expression CLOSING_PARENTHESIS block  {
-                                                                                    $$ = $3;
-                                                                                }
+case_header : CASE OPENING_PARENTHESIS expression CLOSING_PARENTHESIS   {
+                                                                            $$ = $3;
+                                                                            char* temp = addTempVar(&tempVars);
+                                                                            fprintf(quadruplesFile, "(==, %s, %s, %s)\n", switchExpr[switchDepth - 1]->label, $3->label, temp);
+                                                                            labelNames[labelDepth] = malloc(20);
+                                                                            sprintf(labelNames[labelDepth], "LABEL%d", labels);
+                                                                            fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n", labels);
+                                                                            labelDepth++;
+                                                                            labels++;
+                                                                        }
+
+case_statement : case_header block  {
+                                        $$ = $1;
+                                        fprintf(quadruplesFile, "(JMP, %s, N/A, N/A)\n", labelNames[switchLabel[switchDepth - 1]]);
+                                        fprintf(quadruplesFile, "%s:\n", labelNames[labelDepth - 1]);
+                                        labelDepth--;
+                                    }
                ;
 
 default_case : DEFAULT block
@@ -1212,6 +1255,15 @@ print_statement : PRINT OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS
 /* Subroutines */
 void yyerror(const char* s) {
     fprintf(stderr, "\nLine %d: %s\n", line, s);
+    if (symbolTableFile) {
+        fclose(symbolTableFile);
+    }
+    if (semanticAnalysisFile) {
+        fclose(semanticAnalysisFile);
+    }
+    if (quadruplesFile) {
+        fclose(quadruplesFile);
+    }
     exit(1);
 }
 
@@ -1241,15 +1293,10 @@ int main(int argc, char** argv) {
         printf("Error opening Quadruples.out.");
         return 1;
     }
-    line = 1;
+    for (int i = 0; i < 100; i++) {
+        numCases[i] = 0;
+    }
     symbolTable = SymbolTable_construct();
-    numParams = 0;
-    lastSymbol = NULL;
-    numArgs = 0;
-    numCases = 0;
-    currFunc = NULL;
-    funcDepth = 0;
-    labels = 0;
 
     yyparse();
     fclose(yyin);
@@ -1257,6 +1304,7 @@ int main(int argc, char** argv) {
     SymbolTable_destroy(symbolTable);
     fclose(symbolTableFile);
     fclose(semanticAnalysisFile);
+    fclose(quadruplesFile);
     
     return 0;
 }
