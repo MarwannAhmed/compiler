@@ -94,9 +94,9 @@ block : SCOPE_START {
                             funcDepth = funcDepth + 1;
                         }
                         for (int i = 0; i < symbolTable->size; i++) {
-                            printf("    ");
+                            fprintf(symbolTableFile, "    ");
                         }
-                        printf("Constructing new table for a new scope: %d\n", symbolTable->size);
+                        fprintf(symbolTableFile, "Constructing new table for a new scope: %d\n", symbolTable->size);
                         SymbolTable_push(symbolTable);
                         if (lastSymbol->kind == KIND_FUNC && currFunc) {
                             yyerror("Invalid statement: cannot declare a function inside a function.");
@@ -129,9 +129,9 @@ block : SCOPE_START {
                                         break;
                                 }
                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                    printf("    ");
+                                    fprintf(symbolTableFile, "    ");
                                 }
-                                printf("Declared a function parameter \"%s\" of type \"%s\"\n", param->name, type_str);
+                                fprintf(symbolTableFile, "Declared a function parameter \"%s\" of type \"%s\"\n", param->name, type_str);
                                 Symbol* symbol = Symbol_construct(param->name, param->kind, param->isInit, line, param->value, NULL, 0);
                                 SymbolTable_insert(symbolTable, symbol);
                             }
@@ -143,9 +143,9 @@ block : SCOPE_START {
                             currFunc = NULL;
                         }
                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                            printf("    ");
+                            fprintf(symbolTableFile, "    ");
                         }
-                        printf("Destroying table for scope: %d\n", symbolTable->size - 1);
+                        fprintf(symbolTableFile, "Destroying table for scope: %d\n", symbolTable->size - 1);
                         SymbolTable_pop(symbolTable);
                         if (currFunc) {
                             funcDepth = funcDepth - 1;
@@ -177,9 +177,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 yyerror("Invalid declaration: cannot create a variable of unknown type.");
                                                             }
                                                             for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                printf("    ");
+                                                                fprintf(symbolTableFile, "    ");
                                                             }
-                                                            printf("Declared a variable \"%s\" of type \"%s\"\n", $2, $1);
+                                                            fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\"\n", $2, $1);
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 0, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
@@ -196,9 +196,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.i = $4->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.i == 1 ? "true" : "false");
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.i == 1 ? "true" : "false");
                                                             }
                                                             else if (strcmp($1, "int") == 0) {
                                                                 value.type = TYPE_INT;
@@ -207,9 +207,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.i = $4->type == TYPE_INT ? $4->data.i : (int) $4->data.f;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %d\n", $2, $1, value.data.i);
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %d\n", $2, $1, value.data.i);
                                                             }
                                                             else if (strcmp($1, "float") == 0) {
                                                                 value.type = TYPE_FLOAT;
@@ -218,9 +218,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.f = $4->type == TYPE_FLOAT ? $4->data.f : (float) $4->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %f\n", $2, $1, value.data.f);
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %f\n", $2, $1, value.data.f);
                                                             }
                                                             else if (strcmp($1, "char") == 0) {
                                                                 value.type = TYPE_CHAR;
@@ -229,9 +229,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.c = $4->data.c;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %c\n", $2, $1, value.data.c);
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %c\n", $2, $1, value.data.c);
                                                             }
                                                             else if (strcmp($1, "string") == 0) {
                                                                 value.type = TYPE_STRING;
@@ -240,9 +240,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.s = $4->data.s;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.s);
+                                                                fprintf(symbolTableFile, "Declared a variable \"%s\" of type \"%s\" and value: %s\n", $2, $1, value.data.s);
                                                             }
                                                             else {
                                                                 yyerror("Invalid declaration: cannot create a variable of unknown type.");
@@ -263,9 +263,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.i = $5->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.i == 1 ? "true" : "false");
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.i == 1 ? "true" : "false");
                                                             }
                                                             else if (strcmp($2, "int") == 0) {
                                                                 value.type = TYPE_INT;
@@ -274,9 +274,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.i = $5->type == TYPE_INT ? $5->data.i : (int) $5->data.f;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %d\n", $3, $2, value.data.i);
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %d\n", $3, $2, value.data.i);
                                                             }
                                                             else if (strcmp($2, "float") == 0) {
                                                                 value.type = TYPE_FLOAT;
@@ -285,9 +285,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.f = $5->type == TYPE_FLOAT ? $5->data.f : (float) $5->data.i;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %f\n", $3, $2, value.data.f);
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %f\n", $3, $2, value.data.f);
                                                             }
                                                             else if (strcmp($2, "char") == 0) {
                                                                 value.type = TYPE_CHAR;
@@ -296,9 +296,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.c = $5->data.c;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %c\n", $3, $2, value.data.c);
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %c\n", $3, $2, value.data.c);
                                                             }
                                                             else if (strcmp($2, "string") == 0) {
                                                                 value.type = TYPE_STRING;
@@ -307,9 +307,9 @@ declaration : TYPE IDENTIFIER                           {
                                                                 }
                                                                 value.data.s = $5->data.s;
                                                                 for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                    printf("    ");
+                                                                    fprintf(symbolTableFile, "    ");
                                                                 }
-                                                                printf("Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.s);
+                                                                fprintf(symbolTableFile, "Declared a constant \"%s\" of type \"%s\" and value: %s\n", $3, $2, value.data.s);
                                                             }
                                                             else {
                                                                 yyerror("Invalid declaration: cannot create a constant of unknown type.");
@@ -450,9 +450,9 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                     value.type = TYPE_VOID;
                                                                                                     value.data.i = 0;
                                                                                                     for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                        printf("    ");
+                                                                                                        fprintf(symbolTableFile, "    ");
                                                                                                     }
-                                                                                                    printf("Declared a function \"%s\" of type \"void\" with %d parameters.\n", $2, numParams);
+                                                                                                    fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\" with %d parameters.\n", $2, numParams);
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     lastSymbol = symbol;
@@ -467,41 +467,41 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                         value.type = TYPE_BOOL;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else if (strcmp($1, "int") == 0) {
                                                                                                         value.type = TYPE_INT;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else if (strcmp($1, "float") == 0) {
                                                                                                         value.type = TYPE_FLOAT;
                                                                                                         value.data.f = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else if (strcmp($1, "char") == 0) {
                                                                                                         value.type = TYPE_CHAR;
                                                                                                         value.data.c = '0';
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else if (strcmp($1, "string") == 0) {
                                                                                                         value.type = TYPE_STRING;
                                                                                                         value.data.s = "";
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
                                                                                                     }
                                                                                                     else {
                                                                                                         yyerror("Invalid declaration: cannot create a function of unknown type.");
@@ -519,9 +519,9 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                     value.type = TYPE_VOID;
                                                                                                     value.data.i = 0;
                                                                                                     for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                        printf("    ");
+                                                                                                        fprintf(symbolTableFile, "    ");
                                                                                                     }
-                                                                                                    printf("Declared a function \"%s\" of type \"void\"\n", $2);
+                                                                                                    fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\"\n", $2);
                                                                                                     Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     lastSymbol = symbol;
@@ -536,41 +536,41 @@ function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSIN
                                                                                                         value.type = TYPE_BOOL;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else if (strcmp($1, "int") == 0) {
                                                                                                         value.type = TYPE_INT;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else if (strcmp($1, "float") == 0) {
                                                                                                         value.type = TYPE_FLOAT;
                                                                                                         value.data.f = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else if (strcmp($1, "char") == 0) {
                                                                                                         value.type = TYPE_CHAR;
                                                                                                         value.data.c = '0';
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else if (strcmp($1, "string") == 0) {
                                                                                                         value.type = TYPE_STRING;
                                                                                                         value.data.s = "";
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                            printf("    ");
+                                                                                                            fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        printf("Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
                                                                                                     }
                                                                                                     else {
                                                                                                         yyerror("Invalid declaration: cannot create a function of unknown type.");
@@ -1086,6 +1086,16 @@ int main(int argc, char** argv) {
         yyin = stdin;
     }
 
+    symbolTableFile = fopen("SymbolTable.out", "w");
+    if (symbolTableFile == NULL) {
+        printf("Error opening SymbolTable.out.");
+        return 1;
+    }
+    semanticAnalysisFile = fopen("SemanticAnalysis.out", "w");
+    if (semanticAnalysisFile == NULL) {
+        printf("Error opening SemanticAnalysis.out.");
+        return 1;
+    }
     line = 1;
     symbolTable = SymbolTable_construct();
     numParams = 0;
@@ -1099,6 +1109,8 @@ int main(int argc, char** argv) {
     fclose(yyin);
 
     SymbolTable_destroy(symbolTable);
+    fclose(symbolTableFile);
+    fclose(semanticAnalysisFile);
     
     return 0;
 }
