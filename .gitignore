@@ -1,0 +1,7 @@
+Compiler.exe
+Parser.tab.c
+Parser.tab.h
+lex.yy.c
+Parser.output
+src.txt
+.vscode/
