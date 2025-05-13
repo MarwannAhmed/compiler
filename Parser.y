@@ -262,7 +262,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             Symbol* symbol = Symbol_construct($2, KIND_VAR, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
-                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n\n", "=", $4->label, "N/A", $2);
+                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n\n", "=", $4->label, $2);
                                                             tempVars = 0;
                                                         }
             | CONST TYPE IDENTIFIER ASSIGN expression   {
@@ -338,7 +338,7 @@ declaration : TYPE IDENTIFIER                           {
                                                             Symbol* symbol = Symbol_construct($2, KIND_CONST, 1, line, value, NULL, 0);
                                                             SymbolTable_insert(symbolTable, symbol);
                                                             lastSymbol = symbol;
-                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n\n", "=", $5->label, "N/A", $3);
+                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n\n", "=", $5->label, $3);
                                                             tempVars = 0;
                                                         }
             ;
@@ -374,7 +374,7 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                         var->value.data.s = $3->data.s;
                                                         break;
                                                 }
-                                                fprintf(quadruplesFile, "(%s, %s, %s, %s)\n\n", "=", $3->label, "N/A", $1);
+                                                fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n\n", "=", $3->label, $1);
                                                 tempVars = 0;
                                             }
            ;
@@ -385,6 +385,7 @@ decision : expression   {
                                 yyerror("Invalid statement: cannot use a non-boolean expression as a decision expression.");
                             }
                             $$ = $1;
+                            tempVars = 0;
                         }
 
 iterator : expression   {
@@ -395,8 +396,23 @@ iterator : expression   {
                             $$ = $1;
                         }
 
-if_statement : IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS block
-             | IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS block ELSE block
+if_header : IF OPENING_PARENTHESIS decision CLOSING_PARENTHESIS                 {
+                                                                                    fprintf(quadruplesFile, "(JZ, LABEL%d, N/A, N/A)\n\n", labels);
+                                                                                    labels++;
+                                                                                }
+          ;
+
+if_statement : if_header block              {
+                                                fprintf(quadruplesFile, "LABEL%d:\n\n", labels - 1);
+                                            }
+             | if_header block ELSE         {
+                                                fprintf(quadruplesFile, "(JMP, LABEL%d, N/A, N/A)\n\n", labels);
+                                                labels++;
+                                                fprintf(quadruplesFile, "LABEL%d:\n\n", labels - 2);
+                                            }
+               block                        {
+                                                fprintf(quadruplesFile, "LABEL%d:\n\n", labels - 1);
+                                            }
              ;
 
 switch_statement : SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS SCOPE_START case_statements SCOPE_END              {
@@ -1089,7 +1105,7 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                                 $$->data.f = -($2->data.f);
                                                                             }
                                                                             $$->label = addTempVar(&tempVars);
-                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "-", $2->label, "N/A", $$->label);
+                                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "-", $2->label, $$->label);
                                                                         }
         | NOT primary                                                   {
                                                                             if ($2->type != TYPE_BOOL) {
@@ -1100,7 +1116,7 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                             $$->type = TYPE_BOOL;
                                                                             $$->data.i = !($2->data.i);
                                                                             $$->label = addTempVar(&tempVars);
-                                                                            fprintf(quadruplesFile, "(%s, %s, %s, %s)\n", "!", $2->label, "N/A", $$->label);
+                                                                            fprintf(quadruplesFile, "(%s, %s, N/A, %s)\n", "!", $2->label, $$->label);
                                                                         }
         | INTEGER                                                       {
                                                                             $$ = malloc(sizeof(Value));
@@ -1233,6 +1249,7 @@ int main(int argc, char** argv) {
     numCases = 0;
     currFunc = NULL;
     funcDepth = 0;
+    labels = 0;
 
     yyparse();
     fclose(yyin);

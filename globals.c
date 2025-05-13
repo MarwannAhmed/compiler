@@ -12,3 +12,4 @@ int numCases = 0;
 Symbol* currFunc = NULL;
 int funcDepth = 0;
 int tempVars = 0;
+int labels = 0;

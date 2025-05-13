@@ -15,5 +15,6 @@ extern int numCases;
 extern Symbol* currFunc;
 extern int funcDepth;
 extern int tempVars;
+extern int labels;
 
 #endif
