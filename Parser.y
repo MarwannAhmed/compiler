@@ -155,7 +155,10 @@ block : SCOPE_START {
         statements
         SCOPE_END   {
                         if (funcDepth == 0) {
-                            currFunc = NULL;
+                            if (currFunc) {
+                                currFunc = NULL;
+                                lastSymbol = NULL;
+                            }
                         }
                         for (int i = 0; i < symbolTable->size - 1; i++) {
                             fprintf(symbolTableFile, "    ");
@@ -409,6 +412,7 @@ assignment : IDENTIFIER ASSIGN expression   {
                                                         var->value.data.s = $3->data.s;
                                                         break;
                                                 }
+                                                var->isInit = 1;
                                                 fprintf(quadruplesFile, "(=, %s, N/A, %s)\n", $3->label, $1);
                                                 tempVars = 0;
                                             }
@@ -878,7 +882,7 @@ return_statement : RETURN expression    {
                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid statement: returned expression does not match function return type.", line);
                                                 yyerror("Invalid statement: returned expression does not match function return type.");
                                             }
-                                            fprintf(quadruplesFile, "(=, tr, N/A, %s)\n", $2->label);
+                                            fprintf(quadruplesFile, "(=, %s, N/A, tr)\n", $2->label);
                                         }
                  ;
 
