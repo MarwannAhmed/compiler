@@ -115,7 +115,7 @@
 %token GT
 %token EQ
 %token NE
-%type<p> parameter
+%type<p> parameter function_header
 %type<pl> parameter_list
 %type <v> expression mathematical_expression mathematical_term mathematical_exponent logical_expression logical_conjunction logical_comparison primary argument function_call case_statement decision iterator switch_header case_header
 %type<vl> argument_list case_statements
@@ -136,7 +136,7 @@ statement : block
           | for_loop
           | while_loop
           | repeat_loop
-          | function_declaration
+          | function_definition
           | return_statement SEMICOLON
           | function_call SEMICOLON
           | print_statement SEMICOLON
@@ -678,154 +678,179 @@ repeat_loop : REPEAT                                                        {
                                                                             }
             ;
 
-function_declaration : VOID IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSING_PARENTHESIS   {
-                                                                                                    if (ScopeSymbolTable_get(symbolTable->head, $2)) {
-                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
-                                                                                                        yyerror("Invalid declaration: cannot redeclare symbol.");
-                                                                                                    }
+function_header : VOID IDENTIFIER   {
+                                        if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                            fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
+                                            yyerror("Invalid declaration: cannot redeclare symbol.");
+                                        }
+                                        Value value;
+                                        value.type = TYPE_VOID;
+                                        value.data.i = 0;
+                                        $$ = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
+                                        fprintf(quadruplesFile, "PROC %s\n", $2);
+                                    }
+                | TYPE IDENTIFIER   {
+                                        if (ScopeSymbolTable_get(symbolTable->head, $2)) {
+                                            fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
+                                            yyerror("Invalid declaration: cannot redeclare symbol.");
+                                        }
+                                        Value value;
+                                        if (strcmp($1, "bool") == 0) {
+                                            value.type = TYPE_BOOL;
+                                            value.data.i = 0;
+                                        }
+                                        else if (strcmp($1, "int") == 0) {
+                                            value.type = TYPE_INT;
+                                            value.data.i = 0;
+                                        }
+                                        else if (strcmp($1, "float") == 0) {
+                                            value.type = TYPE_FLOAT;
+                                            value.data.f = 0;
+                                        }
+                                        else if (strcmp($1, "char") == 0) {
+                                            value.type = TYPE_CHAR;
+                                            value.data.c = '0';
+                                        }
+                                        else if (strcmp($1, "string") == 0) {
+                                            value.type = TYPE_STRING;
+                                            value.data.s = "";
+                                        }
+                                        else {
+                                            fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a function of unknown type.", line);
+                                            yyerror("Invalid declaration: cannot create a function of unknown type.");
+                                        }
+                                        $$ = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
+                                        fprintf(quadruplesFile, "PROC %s\n", $2);
+                                    }
+                ;
+
+function_definition : function_header OPENING_PARENTHESIS parameter_list CLOSING_PARENTHESIS   {
                                                                                                     Value value;
-                                                                                                    value.type = TYPE_VOID;
-                                                                                                    value.data.i = 0;
-                                                                                                    for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                        fprintf(symbolTableFile, "    ");
+                                                                                                    if ($1->value.type == TYPE_VOID) {
+                                                                                                        value.type = TYPE_VOID;
+                                                                                                        value.data.i = 0;
+                                                                                                        for (int i = 0; i < symbolTable->size - 1; i++) {
+                                                                                                            fprintf(symbolTableFile, "    ");
+                                                                                                        }
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\" with %d parameters.\n", $1->name, numParams);
                                                                                                     }
-                                                                                                    fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\" with %d parameters.\n", $2, numParams);
-                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
-                                                                                                    SymbolTable_insert(symbolTable, symbol);
-                                                                                                    writeSymbolToVisualiser(symbol, symbolTable->size);
-                                                                                                    lastSymbol = symbol;
-                                                                                                }
-                       block
-                     | TYPE IDENTIFIER OPENING_PARENTHESIS parameter_list CLOSING_PARENTHESIS   {
-                                                                                                    if (ScopeSymbolTable_get(symbolTable->head, $2)) {
-                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
-                                                                                                        yyerror("Invalid declaration: cannot redeclare symbol.");
-                                                                                                    }
-                                                                                                    Value value;
-                                                                                                    if (strcmp($1, "bool") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_BOOL) {
                                                                                                         value.type = TYPE_BOOL;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"bool\" with %d parameters.\n", $1->name, numParams);
                                                                                                     }
-                                                                                                    else if (strcmp($1, "int") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_INT) {
                                                                                                         value.type = TYPE_INT;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"int\" with %d parameters.\n", $1->name, numParams);
                                                                                                     }
-                                                                                                    else if (strcmp($1, "float") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_FLOAT) {
                                                                                                         value.type = TYPE_FLOAT;
                                                                                                         value.data.f = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"float\" with %d parameters.\n", $1->name, numParams);
                                                                                                     }
-                                                                                                    else if (strcmp($1, "char") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_CHAR) {
                                                                                                         value.type = TYPE_CHAR;
                                                                                                         value.data.c = '0';
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"char\" with %d parameters.\n", $1->name, numParams);
                                                                                                     }
-                                                                                                    else if (strcmp($1, "string") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_STRING) {
                                                                                                         value.type = TYPE_STRING;
                                                                                                         value.data.s = "";
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\" with %d parameters.\n", $2, $1, numParams);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"string\" with %d parameters.\n", $1->name, numParams);
                                                                                                     }
                                                                                                     else {
                                                                                                         fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a function of unknown type.", line);
                                                                                                         yyerror("Invalid declaration: cannot create a function of unknown type.");
                                                                                                     }
-                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, $4, numParams);
+                                                                                                    Symbol* symbol = Symbol_construct($1->name, KIND_FUNC, 1, line, value, $3, numParams);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     writeSymbolToVisualiser(symbol, symbolTable->size);
                                                                                                     lastSymbol = symbol;
+                                                                                                    for (int i = numParams - 1; i >= 0; i--) {
+                                                                                                        fprintf(quadruplesFile, "(POP, N/A, N/A, %s)\n", ($3)[i]->name);
+                                                                                                    }
                                                                                                 }
-                       block
-                     | VOID IDENTIFIER OPENING_PARENTHESIS CLOSING_PARENTHESIS                  {
-                                                                                                    if (ScopeSymbolTable_get(symbolTable->head, $2)) {
-                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
-                                                                                                        yyerror("Invalid declaration: cannot redeclare symbol.");
-                                                                                                    }
-                                                                                                    Value value;
-                                                                                                    value.type = TYPE_VOID;
-                                                                                                    value.data.i = 0;
-                                                                                                    for (int i = 0; i < symbolTable->size - 1; i++) {
-                                                                                                        fprintf(symbolTableFile, "    ");
-                                                                                                    }
-                                                                                                    fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\"\n", $2);
-                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
-                                                                                                    SymbolTable_insert(symbolTable, symbol);
-                                                                                                    writeSymbolToVisualiser(symbol, symbolTable->size);
-                                                                                                    lastSymbol = symbol;
+                       block                                                                    {
+                                                                                                    fprintf(quadruplesFile, "(RET, N/A, N/A, N/A)\n");
                                                                                                 }
-                       block
-                     | TYPE IDENTIFIER OPENING_PARENTHESIS CLOSING_PARENTHESIS                  {
-                                                                                                    if (ScopeSymbolTable_get(symbolTable->head, $2)) {
-                                                                                                        fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot redeclare symbol.", line);
-                                                                                                        yyerror("Invalid declaration: cannot redeclare symbol.");
-                                                                                                    }
+                     | function_header OPENING_PARENTHESIS CLOSING_PARENTHESIS                  {
                                                                                                     Value value;
-                                                                                                    if (strcmp($1, "bool") == 0) {
+                                                                                                    if ($1->value.type == TYPE_VOID) {
+                                                                                                        value.type = TYPE_VOID;
+                                                                                                        value.data.i = 0;
+                                                                                                        for (int i = 0; i < symbolTable->size - 1; i++) {
+                                                                                                            fprintf(symbolTableFile, "    ");
+                                                                                                        }
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"void\".\n", $1->name);
+                                                                                                    }
+                                                                                                    else if ($1->value.type == TYPE_BOOL) {
                                                                                                         value.type = TYPE_BOOL;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"bool\".\n", $1->name);
                                                                                                     }
-                                                                                                    else if (strcmp($1, "int") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_INT) {
                                                                                                         value.type = TYPE_INT;
                                                                                                         value.data.i = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"int\".\n", $1->name);
                                                                                                     }
-                                                                                                    else if (strcmp($1, "float") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_FLOAT) {
                                                                                                         value.type = TYPE_FLOAT;
                                                                                                         value.data.f = 0;
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"float\".\n", $1->name);
                                                                                                     }
-                                                                                                    else if (strcmp($1, "char") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_CHAR) {
                                                                                                         value.type = TYPE_CHAR;
                                                                                                         value.data.c = '0';
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"char\".\n", $1->name);
                                                                                                     }
-                                                                                                    else if (strcmp($1, "string") == 0) {
+                                                                                                    else if ($1->value.type == TYPE_STRING) {
                                                                                                         value.type = TYPE_STRING;
                                                                                                         value.data.s = "";
                                                                                                         for (int i = 0; i < symbolTable->size - 1; i++) {
                                                                                                             fprintf(symbolTableFile, "    ");
                                                                                                         }
-                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"%s\"\n", $2, $1);
+                                                                                                        fprintf(symbolTableFile, "Declared a function \"%s\" of type \"string\".\n", $1->name);
                                                                                                     }
                                                                                                     else {
                                                                                                         fprintf(semanticAnalysisFile, "Line %d: Invalid declaration: cannot create a function of unknown type.", line);
                                                                                                         yyerror("Invalid declaration: cannot create a function of unknown type.");
                                                                                                     }
-                                                                                                    Symbol* symbol = Symbol_construct($2, KIND_FUNC, 1, line, value, NULL, 0);
+                                                                                                    Symbol* symbol = Symbol_construct($1->name, KIND_FUNC, 1, line, value, NULL, 0);
                                                                                                     SymbolTable_insert(symbolTable, symbol);
                                                                                                     writeSymbolToVisualiser(symbol, symbolTable->size);
                                                                                                     lastSymbol = symbol;
                                                                                                 }
-                       block
+                       block                                                                    {
+                                                                                                    fprintf(quadruplesFile, "(RET, N/A, N/A, N/A)\n");
+                                                                                                }
                      ;
 
 parameter_list : parameter_list COMMA parameter {
@@ -886,6 +911,7 @@ return_statement : RETURN expression    {
                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid statement: returned expression does not match function return type.", line);
                                                 yyerror("Invalid statement: returned expression does not match function return type.");
                                             }
+                                            fprintf(quadruplesFile, "(=, tr, N/A, %s)\n", $2->label);
                                         }
                  ;
 
@@ -933,6 +959,10 @@ function_call : IDENTIFIER OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS
                                                                                                 break;
                                                                                         }
                                                                                         func->isUsed = 1;
+                                                                                        for (int i = 0; i < numArgs; i++) {
+                                                                                            fprintf(quadruplesFile, "(PUSH, %s, N/A, N/A)\n", ($3)[i]->label);
+                                                                                        }
+                                                                                        fprintf(quadruplesFile, "(CALL, %s, N/A, N/A)\n", $1);
                                                                                     }
               | IDENTIFIER OPENING_PARENTHESIS CLOSING_PARENTHESIS                  {
                                                                                         Symbol* func = SymbolTable_get(symbolTable, $1);
@@ -967,6 +997,7 @@ function_call : IDENTIFIER OPENING_PARENTHESIS argument_list CLOSING_PARENTHESIS
                                                                                                 break;
                                                                                         }
                                                                                         func->isUsed = 1;
+                                                                                        fprintf(quadruplesFile, "(CALL, %s, N/A, N/A)\n", $1);
                                                                                     }
               ;
 
@@ -1168,7 +1199,7 @@ mathematical_expression : mathematical_expression PLUS mathematical_term    {
                                                                                 $$ = malloc(sizeof(Value));
                                                                                 $$->type = ($1->type == TYPE_FLOAT || $3->type == TYPE_FLOAT) ? TYPE_FLOAT : TYPE_INT;
                                                                                 if ($$->type == TYPE_INT) {
-                                                                                    $$->data.i = $1->data.i - $3->data.i;
+                                                                                    $$->data.i = $1->data.i + $3->data.i;
                                                                                 }
                                                                                 else {
                                                                                     $$->data.f = (float) ($1->type == TYPE_INT ? $1->data.i : $1->data.f) + ($3->type == TYPE_INT ? $3->data.i : $3->data.f);
@@ -1385,7 +1416,27 @@ primary : OPENING_PARENTHESIS logical_expression CLOSING_PARENTHESIS    {
                                                                                 fprintf(semanticAnalysisFile, "Line %d: Invalid expression: cannot call a \"void\" function.", line);
                                                                                 yyerror("Invalid expression: cannot call a \"void\" function.");
                                                                             }
-                                                                            $$ = $1;
+                                                                            $$ = malloc(sizeof(Value));
+                                                                            $$->type = $1->type;
+                                                                            switch($$->type) {
+                                                                                case TYPE_BOOL:
+                                                                                    $$->data.i = $1->data.i;
+                                                                                    break;
+                                                                                case TYPE_INT:
+                                                                                    $$->data.i = $1->data.i;
+                                                                                    break;
+                                                                                case TYPE_FLOAT:
+                                                                                    $$->data.f = $1->data.f;
+                                                                                    break;
+                                                                                case TYPE_CHAR:
+                                                                                    $$->data.c = $1->data.c;
+                                                                                    break;
+                                                                                case TYPE_STRING:
+                                                                                    $$->data.s = $1->data.s;
+                                                                                    break;
+                                                                            }
+                                                                            $$->label = malloc(3);
+                                                                            $$->label = "tr";
                                                                         }
         ;
 
