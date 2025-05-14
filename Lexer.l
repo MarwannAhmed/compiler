@@ -1,6 +1,6 @@
 /* Definitions */
 %{
-    #include "globals.h"
+    #include "utils.h"
 
     #include "Parser.tab.h"
 %}
