@@ -148,7 +148,7 @@ The following tokens are recognized by the lexical analyzer (defined in `Lexer.l
 | `POW`                  | `^`         | Power (exponentiation)    |             
 | `LT`, `LE`, `GT`, `GE` | `< <= > >=` | Comparison                |             
 | `EQ`, `NE`             | `== !=`     | Equality                  |             
-| `AND`, `OR`, `NOT`     | `&\| !`     | Logical ops               |
+| `AND`, `OR`, `NOT`     | `& \| !`    | Logical ops               |
 | `SEMICOLON`            | `;`         | Statement terminator      |             
 | `COMMA`                | `,`         | Separator                 |             
 | `OPENING_PARENTHESIS`  | `(`         | Grouping or call          |             
@@ -217,7 +217,7 @@ When a field is not required (e.g. unary operations or jumps), it is denoted as 
 
 ### 🔹 Special Variables and Labels
 
-* **Branching targets** are denoted as labels written in all caps and followed by a colon (example: LABEL0:).
-* **Function definitions** start with PROC followed by function name and end with RET.
-* **Function return values** are stored in special variable tr.
-* **Switch expressions** are stored in special variable sr.
+* **Branching targets** are denoted as labels written in all caps and followed by a colon (example: `LABEL0:`).
+* **Function definitions** start with `PROC` followed by function name and end with `RET`.
+* **Function return values** are stored in special variable `tr`.
+* **Switch expressions** are stored in special variable `sr`.
