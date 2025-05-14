@@ -479,7 +479,7 @@ switch_header : SWITCH OPENING_PARENTHESIS expression CLOSING_PARENTHESIS   {
                                                                                 labels++;
                                                                                 $$ = switchExpr[switchDepth - 1];
                                                                                 fprintf(quadruplesFile, "(PUSH, sr, N/A, N/A)\n");
-                                                                                fprintf(quadruplesFile, "(=, N/A, %s, sr)\n", $3->label);
+                                                                                fprintf(quadruplesFile, "(=, %s, N/A, sr)\n", $3->label);
                                                                                 tempVars = 0;
                                                                             }
               ;
